@@ -9,7 +9,7 @@ from datetime import datetime
 def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation_vars, unique_id, run_ids, filters):
     # Create a PDF document
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    pdf_filename = f"/tmp/causal_anallysis_report_{timestamp}-{unique_id}.pdf"
+    pdf_filename = f"/tmp/causal_explanation_report_{timestamp}-{unique_id}.pdf"
     doc = SimpleDocTemplate(pdf_filename, pagesize=A4)
 
     # Styles for text
@@ -41,9 +41,9 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     )
 
     # Text above the table
-    title = Paragraph("CausalBench: Causal Analysis Report", title_style)
+    title = Paragraph("CausalBench: Causal Explanation Report", title_style)
     subtitle = Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), subtitle_style)
-    effect = Paragraph(f"<b>Summary:</b> {yaml_data["causal_effects"]["summary"]}", body_style)
+    effect = Paragraph(f"<b>Summary:</b> {yaml_data['causal_effects']['summary']}", body_style)
     spacer = Spacer(1, 25)
     
     sub_headings = []
@@ -52,9 +52,9 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     # Load images from media folder using absolute paths
     script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    img_up_path = os.path.join(script_dir, "media", "causal_analysis_pdf_images", "up.png")
-    img_down_path = os.path.join(script_dir, "media", "causal_analysis_pdf_images", "down.png")
-    img_zero_path = os.path.join(script_dir, "media", "causal_analysis_pdf_images", "zero.png")
+    img_up_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "up.png")
+    img_down_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "down.png")
+    img_zero_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "zero.png")
     img_up = Image(img_up_path, width=16, height=16)
     img_down = Image(img_down_path, width=16, height=16)
     img_zero = Image(img_zero_path, width=16, height=16)
@@ -105,7 +105,7 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     else:
         raw_table_data = yaml_data["causal_effects"]["overall_effects"]
         table_data = [["Variable", "Effect", "Strength"]]
-        grouped_tables.append(Paragraph(f"<b>Summary:</b> {yaml_data["causal_effects"]["summary"]}", subtitle_style))
+        grouped_tables.append(Paragraph(f"<b>Summary:</b> {yaml_data['causal_effects']['summary']}", subtitle_style))
         
         for k, v in raw_table_data.items():
             if abs(v) > 1000 or (abs(v) < 0.01 and v != 0):
@@ -199,9 +199,9 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
             grouped_tables.append(spacer)
     # Legend
     legend_data = [
-        [img_up, f"This variable improves {yaml_data["causal_effects"]["summary"].split()[2]}"],
-        [img_down, f"This variable worsens {yaml_data["causal_effects"]["summary"].split()[2]}"],
-        [img_zero, f"This variable has no effect on {yaml_data["causal_effects"]["summary"].split()[2]}"],
+        [img_up, f"This variable improves {yaml_data['causal_effects']['summary'].split()[2]}"],
+        [img_down, f"This variable worsens {yaml_data['causal_effects']['summary'].split()[2]}"],
+        [img_zero, f"This variable has no effect on {yaml_data['causal_effects']['summary'].split()[2]}"],
     ]
 
     legend = Table(legend_data, hAlign="LEFT")
@@ -217,11 +217,18 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
 
     legend.setStyle(TableStyle(legend_style))
     
+    recommendations_header = Paragraph(
+        "<b>Recommendations:</b>",
+        subtitle_style
+    )
+
+    results = [f"({', '.join(map(str, result))})" for result in causal_recommendation_results[0]]
     recommendations = Paragraph(
-        f"<b>Recommendations:</b> Additional Hyperparameter settings to consider for your experiments: <br /> "
-        f"[{','.join(map(str, causal_recommendation_vars))}]: [{','.join(map(str, causal_recommendation_results[0]))}]",
+        f"Additional Hyperparameter settings to consider for your experiments:<br />"
+        f"[{', '.join(map(str, causal_recommendation_vars))}]: [{', '.join(map(str, results))}]",
         body_style
     )
+
     run_id_header = Paragraph(
         "<b>Run IDs:</b>",
         subtitle_style
@@ -231,7 +238,7 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     
     run_ids = [str(run_id) for run_id in run_ids]
     run_id_list = Paragraph(
-        f"<b>Run IDs:</b> {', '.join(run_ids)}",
+        f"{', '.join(run_ids)}",
         body_style
     )
     
@@ -246,10 +253,11 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
         "<br />".join(filters_list),
         body_style
     )
+
     # Build PDF
     if not yaml_data['grouped']:
-        doc.build([title, subtitle, effect, spacer, table, spacer, legend, spacer, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
+        doc.build([title, subtitle, effect, spacer, table, spacer, legend, spacer, recommendations_header, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
     else:
-        doc.build([title, subtitle] + [i for i in grouped_tables] + [legend, spacer, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
+        doc.build([title, subtitle] + [i for i in grouped_tables] + [legend, spacer, recommendations_header, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
 
     return pdf_filename
