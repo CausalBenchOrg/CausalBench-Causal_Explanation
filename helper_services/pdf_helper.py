@@ -218,16 +218,25 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     legend.setStyle(TableStyle(legend_style))
     
     recommendations_header = Paragraph(
-        "<b>Recommendations:</b>",
-        subtitle_style
+        ""
     )
-
-    results = [f"({', '.join(map(str, result))})" for result in causal_recommendation_results[0]]
+    
     recommendations = Paragraph(
-        f"Additional Hyperparameter settings to consider for your experiments:<br />"
-        f"[{', '.join(map(str, causal_recommendation_vars))}]: [{', '.join(map(str, results))}]",
-        body_style
+        ""
     )
+    
+    if causal_recommendation_results is not None:
+        recommendations_header = Paragraph(
+            "<b>Recommendations:</b>",
+            subtitle_style
+        )
+
+        results = [f"({', '.join(map(str, result))})" for result in causal_recommendation_results[0]]
+        recommendations = Paragraph(
+            f"Additional Hyperparameter settings to consider for your experiments:<br />"
+            f"[{', '.join(map(str, causal_recommendation_vars))}]: [{', '.join(map(str, results))}]",
+            body_style
+        )
 
     run_id_header = Paragraph(
         "<b>Run IDs:</b>",
