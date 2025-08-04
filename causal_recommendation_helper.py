@@ -44,7 +44,7 @@ def generate_grid_points(dimensions):
         if count == 1:
             grids.append([ (min_v + max_v) / 2.0 ])
         else:
-            if dim == "HP.alpha":
+            if dim == "alpha":
                 grids.append(np.linspace(min_v, max_v, count))
             else:
                 grids.append(np.linspace(min_v, max_v, count, dtype=int))
