@@ -3,4 +3,4 @@ CAUSAL_ANALYSIS_EMAIL_BODY = "Please find the causal analysis results in the pdf
 EMAIL = "admin@causalbench.org"
 SEND_AS_EMAIL = "register@causalbench.org"
 REPLY_TO_ADDRESS = "contact@causalbench.org"
-EMAIL_PASSWORD = "zrwakioxcinloiht"
+EMAIL_PASSWORD = ""
