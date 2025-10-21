@@ -52,8 +52,8 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     # Load images from media folder using absolute paths
     script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    img_up_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "up.png")
-    img_down_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "down.png")
+    img_up_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "blue_up.png")
+    img_down_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "blue_down.png")
     img_zero_path = os.path.join(script_dir, "media", "causal_explanation_pdf_images", "zero.png")
     img_up = Image(img_up_path, width=16, height=16)
     img_down = Image(img_down_path, width=16, height=16)
@@ -199,8 +199,8 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
             grouped_tables.append(spacer)
     # Legend
     legend_data = [
-        [img_up, f"This variable improves {yaml_data['causal_effects']['summary'].split()[2]}"],
-        [img_down, f"This variable worsens {yaml_data['causal_effects']['summary'].split()[2]}"],
+        [img_up, f"This variable increases {yaml_data['causal_effects']['summary'].split()[2]}"],
+        [img_down, f"This variable decreases {yaml_data['causal_effects']['summary'].split()[2]}"],
         [img_zero, f"This variable has no effect on {yaml_data['causal_effects']['summary'].split()[2]}"],
     ]
 
