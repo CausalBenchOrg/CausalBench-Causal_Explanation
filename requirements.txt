@@ -7,6 +7,6 @@ numpy
 requests
 boto3
 rapidfuzz
-causalbench-asu==0.1.7
+causalbench-asu==0.2.4
 urllib3
 reportlab
