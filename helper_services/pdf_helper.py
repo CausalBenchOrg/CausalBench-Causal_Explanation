@@ -41,7 +41,7 @@ def generate_pdf(yaml_data, causal_recommendation_results, causal_recommendation
     )
 
     # Text above the table
-    title = Paragraph("CausalBench: Causal Explanation Report", title_style)
+    title = Paragraph("CausalBench+: Causal Explanation Report", title_style)
     subtitle = Paragraph(
         datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         subtitle_style
