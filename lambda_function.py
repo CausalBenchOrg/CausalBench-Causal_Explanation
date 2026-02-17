@@ -28,10 +28,12 @@ def handler(event, context):
     else:
         causal_effects = causal_analysis_results["causal_effects"]["overall_effects"]
         for k, v in causal_effects.items():
+            k = k.split(".")[1]  # Remove 'HP.' prefix
             if k in list(event.get('hyperparameter_limits', {}).keys()) and v != 0:
                 dimensions[k]['strength'] = v
                 dimensions[k]['min_val'] = event.get('hyperparameter_limits', {})[k]['min']
                 dimensions[k]['max_val'] = event.get('hyperparameter_limits', {})[k]['max']
+    
     try:
         if len(dimensions) > 0:
             causal_recommendation_results = run_causal_recommendation(dimensions, max_points)
