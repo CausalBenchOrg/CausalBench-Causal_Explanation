@@ -1,0 +1,36 @@
+{
+    "zip_urls": ["https://causalbench.org/api/runs/profiling/download?profiling_link=runs-3fb16ea2-f681-4a2c-b26e-e097ea508a65-run.zip"],
+    "candidate_hyperparameters": ["min_samples_leaf", "max_features"],
+    "outcome_column": "Metric.Score",
+    "hyperparameter_limits": {
+        "min_samples_leaf": {
+            "min": 1,
+            "max": 10
+        },
+        "max_features": {
+            "min": 1,
+            "max": 10
+        }
+    },
+    "user_email": "pmandal5@asu.edu",
+    "unique_id": "d0c2b48d",
+    "run_ids": [111],
+    "filters": [
+        "<b>Run ID:</b> ['111']",
+        "<b>Context ID:</b> []",
+        "<b>Context Version:</b> []",
+        "<b>Context Name:</b> []",
+        "<b>Dataset ID:</b> []",
+        "<b>Dataset Version:</b> []",
+        "<b>Dataset Name:</b> []",
+        "<b>Model ID:</b> []",
+        "<b>Model Version:</b> []",
+        "<b>Model Name:</b> []",
+        "<b>Metric ID:</b> []",
+        "<b>Metric Version:</b> []",
+        "<b>Metric Name:</b> []",
+        "<b>Task ID:</b> []",
+        "<b>Task Version:</b> []",
+        "<b>Time Elapsed:</b> []"
+    ]
+}

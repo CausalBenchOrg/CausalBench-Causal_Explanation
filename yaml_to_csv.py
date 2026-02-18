@@ -7,7 +7,10 @@ from rapidfuzz import process, fuzz
 from causalbench.modules import Dataset
 from causalbench.modules import Run
 from causalbench.modules.context import Context
-os.environ['MPLCONFIGDIR'] = '/tmp/mplconfig'
+
+from common_constants import TEMP_DIR
+os.environ['MPLCONFIGDIR'] = f'{TEMP_DIR}/mplconfig'
+
 # Set working directory to parent dir
 # parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # os.chdir(parent_dir)

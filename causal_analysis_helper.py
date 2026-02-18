@@ -1,4 +1,6 @@
-import yaml
+import atexit
+from collections import defaultdict
+import shutil
 import os
 import tempfile
 from urllib.parse import urlparse
@@ -7,13 +9,13 @@ import numpy as np
 import requests
 import networkx as nx
 from dowhy import CausalModel
-# from services.logger_service import get_logger
+from common_constants import TEMP_DIR
 from yaml_to_csv import main as process_yaml_data, headers
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 global RANDOM_SEED
 RANDOM_SEED = 42
-os.environ['MPLCONFIGDIR'] = '/tmp/mplconfig'
+os.environ['MPLCONFIGDIR'] = f'{TEMP_DIR}/mplconfig'
 
 def compute_CATE(data, treatment, outcome, graph):
     try:
@@ -108,6 +110,7 @@ def fetch_zip_files(zip_urls, download_dir):
     downloaded_files = []
     
     os.makedirs(download_dir, exist_ok=True)
+    atexit.register(lambda: shutil.rmtree(download_dir))
     
     for url in sorted(zip_urls):
         filepath = download_zip_from_url(url, download_dir)
@@ -120,8 +123,7 @@ def fetch_zip_files(zip_urls, download_dir):
 
 def run_causal_analysis(zip_urls, 
                         candidate_hyperparameters=None, 
-                        outcome_column=None, 
-                        output_filename='/tmp/causal_analysis_results.yaml',
+                        outcome_column=None,
                         logger=None):
     """
     Run causal analysis on data from the provided ZIP URLs.
@@ -223,7 +225,6 @@ def run_causal_analysis(zip_urls,
         
     except Exception as e:
         print(f"Error loading data: {e}")
-        print(f"Error loading data: {e}")
 
     if group_by_metric:
         df_columns = ['dataset', 'model', 'metric'] + hyperparameters + ['outcome']
@@ -281,104 +282,56 @@ def run_causal_analysis(zip_urls,
     print(f"Normalizing columns: {numeric_cols}")
 
     if numeric_cols:
-        df_original = df[numeric_cols].copy()
-        
         df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-        
         print("Features normalized using StandardScaler")
     else:
         print("No numeric columns found to normalize")
 
     print(f"Processing {len(df)} total experiments")
-    
-    all_results = {}
-    total_experiments = len(df)
+
+    group_results = defaultdict(lambda: defaultdict(dict))
 
     if group_by_metric:
-        grouped = df.groupby(['dataset', 'model', 'metric'])
-        print(f"Found {len(grouped)} unique dataset-model-metric combinations")
+        grouped = df.groupby('metric')
+        print(f"Found {len(grouped)} unique metrics")
         
-        group_results = {}
-        for (dataset, model, metric), group_data in grouped:
-            if len(group_data) >= 2:
+        for metric, group_data in grouped:
+            if len(group_data) > 1:
                 try:
                     analysis_data = group_data.reset_index(drop=True)
                     
                     score = compute_score(analysis_data, hyperparameters, 'outcome')
                     
-                    group_key = f"{dataset}-{model}-{metric}"
-                    group_results[group_key] = {}
+                    group_key = f"{metric}"
                     
-                    for hw_feature in score.index:
-                        effect_value = score.loc[hw_feature, 'outcome']
-                        group_results[group_key][hw_feature] = float(effect_value)
-                        
+                    for feature in score.index:
+                        effect_value = score.loc[feature, 'outcome']
+                        group_results[group_key]['effects'][feature] = round(float(effect_value), 8)
+                    
+                    group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
+
+                    group_results[group_key]['summary'] = f"Effects on {metric} ({len(group_data)} experiments)"
+
                     print(f"Analyzed {group_key}: {len(group_data)} experiments")
                 except Exception as e:
-                    print(f"Error analyzing {dataset}_{model}_{metric}: {e}")
-                    print(f"Error analyzing {dataset}_{model}_{metric}: {e}")
+                    print(f"Error analyzing {metric}: {e}")
                     continue
         
-        feature_effects = {}
-        for group_key, group_effects in group_results.items():
-            for feature, effect in group_effects.items():
-                if feature not in feature_effects:
-                    feature_effects[feature] = []
-                feature_effects[feature].append(effect)
-        
-        for feature, effects in feature_effects.items():
-            all_results[feature] = sum(effects) / len(effects)
-        
-        sorted_features = sorted(all_results.items(), key=lambda x: abs(x[1]), reverse=True)
-        
     else:
-        if len(df) >= 2: 
+        if len(df) > 1: 
             try:
                 analysis_data = df.drop(columns=['dataset'])
+                
                 score = compute_score(analysis_data, hyperparameters, 'outcome')
-                for hw_feature in score.index:
-                    effect_value = score.loc[hw_feature, 'outcome']
-                    all_results[hw_feature] = float(effect_value)
+
+                for feature in score.index:
+                    effect_value = score.loc[feature, 'outcome']
+                    group_results[outcome_column]['effects'][feature] = round(float(effect_value), 8)
+                
+                group_results[outcome_column]['effects'] = dict(sorted(group_results[outcome_column]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
+
+                group_results[outcome_column]['summary'] = f"Effects on {outcome_column} ({len(df)} experiments)"
             except Exception as e:
                 print(f"Error in causal analysis: {e}")
-                print(f"Error in causal analysis: {e}")
 
-        sorted_features = sorted(all_results.items(), key=lambda x: abs(x[1]), reverse=True)
-
-    if group_by_metric and 'group_results' in locals():
-        yaml_results = {
-            'causal_effects': {
-                'summary': f"Effects on {outcome_column} ({total_experiments} experiments, {len(group_results)} groups)",
-                'overall_effects': {},
-                'group_specific_effects': group_results
-            }
-        }
-        
-        for feature, effect in sorted_features:
-            yaml_results['causal_effects']['overall_effects'][feature] = round(float(effect), 8)
-    else:
-        yaml_results = {
-            'causal_effects': {
-                'summary': f"Effects on {outcome_column} ({total_experiments} experiments)",
-                'effects': {}
-            }
-        }
-
-        for feature, effect in sorted_features:
-            yaml_results['causal_effects']['effects'][feature] = round(float(effect), 8)
-        
-    yaml_results['grouped'] = group_by_metric
-
-    with open(output_filename, 'w') as yaml_file:
-        yaml.dump(yaml_results, yaml_file, default_flow_style=False, indent=2, sort_keys=False)
-
-    print(f"Results saved to {output_filename}")
-    print(f"Summary: {len(all_results)} datasets, {total_experiments} experiments, {len(sorted_features) if 'sorted_features' in locals() else 0} features")
-
-    if 'sorted_features' in locals() and sorted_features:
-        print(f"\nTop Effects (saved in YAML):")
-        for rank, (feature, avg_effect) in enumerate(sorted_features[:3], 1):
-            effect_sign = "+" if avg_effect >= 0 else ""
-            print(f"  {rank}. {feature}: {effect_sign}{avg_effect:.6f}")
-
-    return yaml_results, download_dir
+    return group_results, download_dir
