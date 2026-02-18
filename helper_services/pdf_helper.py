@@ -4,7 +4,6 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image, Paragraph, Spacer, HRFlowable
-import uuid
 from datetime import datetime, timezone
 
 from common_constants import TEMP_DIR
@@ -67,9 +66,7 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
         f"Generated on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
         subtitle_style
     )
-    # effect = Paragraph(f"<b>Summary:</b> {causal_analysis_results['causal_effects']['summary']}", body_style)
     
-    sub_headings = []
     grouped_tables = []
 
     # Load images from media folder using absolute paths
@@ -81,8 +78,6 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
     img_up = Image(img_up_path, width=16, height=16)
     img_down = Image(img_down_path, width=16, height=16)
     img_zero = Image(img_zero_path, width=16, height=16)
-
-
 
     # Legend
     legend_data = [
@@ -103,53 +98,6 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
     ]
 
     legend.setStyle(TableStyle(legend_style))
-
-
-
-    # if not causal_analysis_results['grouped']:
-    #     raw_table_data = causal_analysis_results["causal_effects"]["effects"]
-    #     table_data = [["Variable", "Effect", "Strength"]]
-        
-    #     for k, v in raw_table_data.items():
-    #         if abs(v) > 1000 or (abs(v) < 0.01 and v != 0):
-    #                     value_str = f"{v:.4e}"
-    #         else:
-    #             value_str = f"{v:.4f}"
-                
-    #         if v > 0:
-    #             table_data.append([k, img_up, value_str])
-    #         elif v < 0:
-    #             table_data.append([k, img_down, value_str])
-    #         else:
-    #             table_data.append([k, img_zero, value_str])
-        
-    #     # Create the table
-    #     table = Table(table_data, colWidths="*")
-
-    #     # Style the table
-    #     table_style = [
-    #         ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-    #         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-    #         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-
-    #         # Column alignment
-    #         ("ALIGN", (0, 0), (0, -1), "LEFT"),
-    #         ("ALIGN", (1, 0), (1, -1), "CENTER"),
-    #         ("ALIGN", (2, 0), (2, -1), "RIGHT"),
-
-    #         # Vertical alignment
-    #         ('VALIGN', (0, 0), (-1, -1), "MIDDLE"),
-
-    #         # Outer box
-    #         ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
-    #     ]
-
-    #     # Line below each row
-    #     for i in range(len(table_data) - 1):
-    #         table_style.append(("LINEBELOW", (0, i), (-1, i), 0.5, colors.grey))
-
-    #     table.setStyle(TableStyle(table_style))
-    # else:
 
     # Process data
     for group, group_data in causal_analysis_results.items():
@@ -205,18 +153,6 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
             for i, recommendation in enumerate(group_data["recommendations"]):
                 table_data.append((i + 1,) + recommendation)
 
-            # recommendations_header = Paragraph(
-            #     "<b>Recommendations:</b>",
-            #     subtitle_style
-            # )
-
-            # results = [f"({', '.join(map(str, result))})" for result in group_data["recommendations"]]
-            # recommendations = Paragraph(
-            #     f"<br /><b>Additional hyperparameter settings to consider for your experiments:</b><br />"
-            #     f"[{', '.join(map(str, group_data['recommend_dims']))}]: [{', '.join(map(str, results))}]",
-            #     body_style
-            # )
-
             recommendations_header = Paragraph(
                 "<br /><b>Additional hyperparameter settings to consider for your experiments:</b><br /><br />",
                 body_style
@@ -252,76 +188,6 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
             grouped_tables.append(table)
         
         grouped_tables.append(separator)
-        
-        # for key in causal_analysis_results["causal_effects"]["group_specific_effects"]:
-        #     raw_table_data = causal_analysis_results["causal_effects"]["group_specific_effects"][key]
-        #     table_data = [["Variable", "Effect", "Strength"]]
-        #     grouped_tables.append(Paragraph(f"<b>Summary:</b> {key}", subtitle_style))
-            
-        #     for k, v in raw_table_data.items():
-        #         if abs(v) > 1000 or (abs(v) < 0.01 and v != 0):
-        #                 value_str = f"{v:.4e}"
-        #         else:
-        #             value_str = f"{v:.4f}"
-                    
-        #         if v > 0:
-        #             table_data.append([k, img_up, value_str])
-        #         elif v < 0:
-        #             table_data.append([k, img_down, value_str])
-        #         else:
-        #             table_data.append([k, img_zero, value_str])
-            
-        #     # Create the table
-        #     table = Table(table_data, colWidths="*")
-
-        #     # Style the table
-        #     table_style = [
-        #         ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-        #         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-        #         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-
-        #         # Column alignment
-        #         ("ALIGN", (0, 0), (0, -1), "LEFT"),
-        #         ("ALIGN", (1, 0), (1, -1), "CENTER"),
-        #         ("ALIGN", (2, 0), (2, -1), "RIGHT"),
-
-        #         # Vertical alignment
-        #         ('VALIGN', (0, 0), (-1, -1), "MIDDLE"),
-
-        #         # Outer box
-        #         ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
-        #     ]
-
-        #     # Line below each row
-        #     for i in range(len(table_data) - 1):
-        #         table_style.append(("LINEBELOW", (0, i), (-1, i), 0.5, colors.grey))
-
-        #     table.setStyle(TableStyle(table_style))
-            
-        #     grouped_tables.append(table)
-        #     grouped_tables.append(spacer)
-
-    
-    # recommendations_header = Paragraph(
-    #     ""
-    # )
-    
-    # recommendations = Paragraph(
-    #     ""
-    # )
-    
-    # if causal_recommendation_results is not None:
-    #     recommendations_header = Paragraph(
-    #         "<b>Recommendations:</b>",
-    #         subtitle_style
-    #     )
-
-    #     results = [f"({', '.join(map(str, result))})" for result in causal_recommendation_results[0]]
-    #     recommendations = Paragraph(
-    #         f"Additional Hyperparameter settings to consider for your experiments:<br />"
-    #         f"[{', '.join(map(str, causal_recommendation_vars))}]: [{', '.join(map(str, results))}]",
-    #         body_style
-    #     )
 
     run_id_header = Paragraph(
         "<b>Run IDs:</b>",
@@ -347,12 +213,6 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
         "<br />".join(filters_list),
         body_style
     )
-
-    # # Build PDF
-    # if not causal_analysis_results['grouped']:
-    #     doc.build([title, subtitle, effect, spacer, table, spacer, legend, spacer, recommendations_header, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
-    # else:
-    #     doc.build([title, subtitle] + [i for i in grouped_tables] + [legend, spacer, recommendations_header, recommendations, spacer, run_id_header, run_id_list, spacer, filter_header, filters_list])
 
     doc.build([title, subtitle, separator, legend, separator] + grouped_tables + [run_id_header, run_id_list, separator, filter_header, filters_list])
 
