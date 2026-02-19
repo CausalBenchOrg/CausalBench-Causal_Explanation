@@ -1,13 +1,15 @@
 from collections import defaultdict
-
 import yaml
-from causal_analysis_helper import run_causal_analysis
+from helper_services.causal_analysis_helper import run_causal_analysis
 import math
-from causal_recommendation_helper import run_causal_recommendation
+from helper_services.causal_recommendation_helper import run_causal_recommendation
+from helper_services.download_helper import download_files
 from helper_services.pdf_helper import generate_pdf
-from mail_services import send_email
+from helper_services.hp_dtype_helper import get_hp_dtypes
+from helper_services.mail_helper import send_email
 import numpy as np
-from common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
+from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
+
 
 def handler(event, context):
     # maximum recommended points
@@ -15,11 +17,20 @@ def handler(event, context):
 
     # outcome column
     outcome_column = event.get('outcome_column', 'Time.Duration')
+
+    # download zip files
+    download_dir, downloaded_files = download_files(zip_urls=event.get('zip_urls', []))
+
+    # find all hyperparameter data types
+    hp_dtypes = get_hp_dtypes(download_dir)
     
     # find all causal effects
-    causal_analysis_results, download_dir = run_causal_analysis(zip_urls=event.get('zip_urls', []),
-                                    outcome_column=outcome_column,
-                                    candidate_hyperparameters= event.get('candidate_hyperparameters', None))
+    causal_analysis_results, download_dir = run_causal_analysis(
+        download_dir=download_dir,
+        hp_dtypes=hp_dtypes,
+        outcome_column=outcome_column,
+        candidate_hyperparameters= event.get('candidate_hyperparameters', None)
+    )
 
     # find all causal recommendations
     for group, group_data in causal_analysis_results.items():
@@ -36,7 +47,9 @@ def handler(event, context):
 
         try:
             if len(dimensions) > 0:
-                group_data['recommendations'] = run_causal_recommendation(dimensions, max_points)[0]
+                cols = ["HP." + dim for dim in dimensions.keys()]
+                data = list(group_data["data"][cols].itertuples(index=False, name=None))
+                group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)[0]
             else:
                 print(f"Skipping Causal Recommendation for {group} as len(dimensions) == 0.")
         except Exception as e:
@@ -44,6 +57,7 @@ def handler(event, context):
         finally:
             print(f"Causal Recommendation {group_data['recommendations']}!")
 
+        group_data['data'] = len(group_data['data'])
 
     # save to file
     output_filename=f'{TEMP_DIR}/causal_analysis_results.yaml'

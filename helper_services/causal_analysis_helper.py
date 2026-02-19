@@ -9,12 +9,11 @@ import numpy as np
 import requests
 import networkx as nx
 from dowhy import CausalModel
-from common_constants import TEMP_DIR
-from yaml_to_csv import main as process_yaml_data, headers
+from common.common_constants import RANDOM_SEED, TEMP_DIR
+from common.yaml_to_csv import main as process_yaml_data, headers
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-global RANDOM_SEED
-RANDOM_SEED = 42
+
 os.environ['MPLCONFIGDIR'] = f'{TEMP_DIR}/mplconfig'
 
 def compute_CATE(data, treatment, outcome, graph):
@@ -33,7 +32,8 @@ def compute_CATE(data, treatment, outcome, graph):
         data_clean = data_clean.sort_values([treatment, outcome]).reset_index(drop=True)
         
         if len(data_clean) < 3:
-            return np.nan
+            # return np.nan
+            return 0.0  # return 0 instead of nan
             
         if data_clean[treatment].std() == 0 or data_clean[outcome].std() == 0:
             return 0.0
@@ -56,7 +56,8 @@ def compute_CATE(data, treatment, outcome, graph):
         return estimate.value
     except Exception as e:
         print(f"Error in CATE computation for {treatment} -> {outcome}: {e}")
-        return np.nan
+        # return np.nan
+        return 0.0  # return 0 instead of nan
 
 
 def compute_score(data, hyperparameters, outcome_column):
@@ -82,46 +83,9 @@ def compute_score(data, hyperparameters, outcome_column):
 
     return scores
 
-def download_zip_from_url(url, download_dir):
-    try:
-        print(f"Downloading {url}...")
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        
-        parsed_url = urlparse(url)
-        filename = os.path.basename(parsed_url.path)
-        if not filename or not filename.endswith('.zip'):
-            filename = f"downloaded_{abs(hash(url)) % 10000:04d}.zip"
-        
-        filepath = os.path.join(download_dir, filename)
-        
-        with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        
-        print(f"Downloaded: {filename}")
-        return filepath
-        
-    except Exception as e:
-        print(f"Error downloading {url}: {e}")
-        # return None
-    
-def fetch_zip_files(zip_urls, download_dir):
-    downloaded_files = []
-    
-    os.makedirs(download_dir, exist_ok=True)
-    atexit.register(lambda: shutil.rmtree(download_dir))
-    
-    for url in sorted(zip_urls):
-        filepath = download_zip_from_url(url, download_dir)
-        if filepath:
-            downloaded_files.append(filepath)
-    
-    downloaded_files.sort()
-    print(f"Successfully downloaded {len(downloaded_files)}/{len(zip_urls)} files")
-    return downloaded_files
 
-def run_causal_analysis(zip_urls, 
+def run_causal_analysis(download_dir,
+                        hp_dtypes=None,
                         candidate_hyperparameters=None, 
                         outcome_column=None,
                         logger=None):
@@ -129,7 +93,7 @@ def run_causal_analysis(zip_urls,
     Run causal analysis on data from the provided ZIP URLs.
     
     Args:
-        zip_urls (list): List of ZIP file URLs to download and analyze
+        download_dir (string): Path to directory containing ZIP files to analyze
         candidate_hyperparameters (list): List of hyperparameter column names to analyze
         outcome_column (str): Column name for the outcome variable to analyze
         output_filename (str): Name of the output YAML file
@@ -155,35 +119,22 @@ def run_causal_analysis(zip_urls,
         'Metric.Memory':['DS.Rows', 'DS.Cols', 'SW.', 'HP.', 'Model.']
     }
     
-    if candidate_hyperparameters is None:
-        if outcome_column in outcome_column_mapping:
-            candidate_hyperparameters = None
-        else:
-            print("No candidate hyperparameters provided and no default mapping found")
+    # if candidate_hyperparameters is None:
+    #     if outcome_column in outcome_column_mapping:
+    #         candidate_hyperparameters = None
+    #     else:
+    #         print("No candidate hyperparameters provided and no default mapping found")
     
     encode = []
     try:    
-        if zip_urls:
-            print(f"Fetching {len(zip_urls)} ZIP files from URLs...")
-            
-            download_dir = os.path.join(tempfile.gettempdir(), "causal_analysis_fixed")
-            print(f"Download directory: {download_dir}")
-            
-            downloaded_files = fetch_zip_files(zip_urls, download_dir)
-            
-            if downloaded_files:
-                raw_df = process_yaml_data(download_dir, headers)
-                print(f"Successfully loaded {len(raw_df)} rows from downloaded files")
-            else:
-                print("No files downloaded successfully")
-                print("No files downloaded successfully")
+        if download_dir:
+            print(f"Processing ZIP files from {download_dir}")
+            raw_df = process_yaml_data(download_dir, headers)
         else:
-            print("No URLs provided")
-            print("No URLs provided")
+            print(f"Invalid location: {download_dir}")
 
         raw_df = raw_df.sort_values(['DS.Name'] + [col for col in sorted(raw_df.columns) if col != 'DS.Name']).reset_index(drop=True)
 
-        # if candidate_hyperparameters is None and outcome_column in outcome_column_mapping:
         if outcome_column in outcome_column_mapping:
             prefixes = outcome_column_mapping[outcome_column]
             potential_cols = [col for col in raw_df.columns 
@@ -191,18 +142,16 @@ def run_causal_analysis(zip_urls,
             
             candidate_hyperparameters = []
             for col in potential_cols:
-                try:
-                    pd.to_numeric(raw_df[col], errors='raise')
+                hp_col = col.split(".")[1]  # Remove 'HP.' prefix
+                if hp_col in hp_dtypes and hp_dtypes[hp_col] in ['integer', 'decimal']:
                     candidate_hyperparameters.append(col)
-                except (ValueError, TypeError):
-                    print(f"Skipping categorical column: {col}")
-                    print(f"Skipping categorical column: {col}")
-                    continue
+                else:
+                    print(f"Skipping non-numeric column: {col}")
             
             print(f"Auto-selected candidate_hyperparameters for {outcome_column}: {len(candidate_hyperparameters)} numeric columns with prefixes {prefixes}")
+        
         elif candidate_hyperparameters is None:
             print("No candidate hyperparameters provided and no default mapping found")
-            # return None
         
         hw_cols = [col for col in raw_df.columns if any(hw in col for hw in ['HW.', 'Model.', 'Time.', 'SW.', 'HP.', 'Metric.'])]
         print(f"Available columns: {sorted(hw_cols)}")
@@ -279,12 +228,15 @@ def run_causal_analysis(zip_urls,
     
     numeric_cols = [col for col in df.columns if col not in exclude_cols]
     numeric_cols = sorted(numeric_cols)
-    print(f"Normalizing columns: {numeric_cols}")
+    print(f"Numeric columns to be normalized: {numeric_cols}")
 
-    if numeric_cols:
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-        print("Features normalized using StandardScaler")
-    else:
+    # if numeric_cols:
+    #     df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+    #     print("Features normalized using StandardScaler")
+    # else:
+    #     print("No numeric columns found to normalize")
+
+    if not numeric_cols:
         print("No numeric columns found to normalize")
 
     print(f"Processing {len(df)} total experiments")
@@ -298,11 +250,17 @@ def run_causal_analysis(zip_urls,
         for metric, group_data in grouped:
             if len(group_data) > 1:
                 try:
+                    group_key = f"{metric}"
+
                     analysis_data = group_data.reset_index(drop=True)
+
+                    group_results[group_key]['data'] = analysis_data.copy(deep=True)
+
+                    if numeric_cols:
+                        analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
+                        print("Features normalized using StandardScaler")
                     
                     score = compute_score(analysis_data, hyperparameters, 'outcome')
-                    
-                    group_key = f"{metric}"
                     
                     for feature in score.index:
                         effect_value = score.loc[feature, 'outcome']
@@ -312,7 +270,7 @@ def run_causal_analysis(zip_urls,
 
                     group_results[group_key]['summary'] = f"Effects on {metric} ({len(group_data)} experiments)"
 
-                    print(f"Analyzed {group_key}: {len(group_data)} experiments")
+                    print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
                 except Exception as e:
                     print(f"Error analyzing {metric}: {e}")
                     continue
@@ -320,17 +278,27 @@ def run_causal_analysis(zip_urls,
     else:
         if len(df) > 1: 
             try:
+                group_key = outcome_column
+
                 analysis_data = df.drop(columns=['dataset'])
+
+                group_results[group_key]['data'] = analysis_data.copy(deep=True)
+
+                if numeric_cols:
+                    analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
+                    print("Features normalized using StandardScaler")
                 
                 score = compute_score(analysis_data, hyperparameters, 'outcome')
 
                 for feature in score.index:
                     effect_value = score.loc[feature, 'outcome']
-                    group_results[outcome_column]['effects'][feature] = round(float(effect_value), 8)
+                    group_results[group_key]['effects'][feature] = round(float(effect_value), 8)
                 
-                group_results[outcome_column]['effects'] = dict(sorted(group_results[outcome_column]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
+                group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
 
-                group_results[outcome_column]['summary'] = f"Effects on {outcome_column} ({len(df)} experiments)"
+                group_results[group_key]['summary'] = f"Effects on {group_key} ({len(df)} experiments)"
+
+                print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
             except Exception as e:
                 print(f"Error in causal analysis: {e}")
 

@@ -1,10 +1,26 @@
 import os
+import smtplib
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from mail_helper_services import start_smtp_connection
-import common_constants
+import common.common_constants as common_constants
+
+
+def start_smtp_connection(email, password):
+    global smtp_connection
+    start = time.time()
+    smtp_connection = smtplib.SMTP('smtp.gmail.com', 587)
+    print(f"SMTP connection started: {str(time.time() - start)}")
+    smtp_connection.starttls()
+    print(f"TLS started: {str(time.time() - start)}")
+    smtp_connection.login(common_constants.EMAIL, common_constants.EMAIL_PASSWORD)
+    print(f"Logged in: {str(time.time() - start)}")
+    print("SMTP connection established.")
+    print(smtp_connection)
+    return smtp_connection
+
 
 def send_email(to: str, subject: str, body: str, attachments: list = None):
     server = start_smtp_connection(common_constants.EMAIL, common_constants.EMAIL_PASSWORD)

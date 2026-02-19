@@ -8,7 +8,7 @@ from causalbench.modules import Dataset
 from causalbench.modules import Run
 from causalbench.modules.context import Context
 
-from common_constants import TEMP_DIR
+from common.common_constants import TEMP_DIR
 os.environ['MPLCONFIGDIR'] = f'{TEMP_DIR}/mplconfig'
 
 # Set working directory to parent dir
@@ -184,6 +184,7 @@ def append_rows_to_df(extracted_data, hyperparameter_list, df):
     print(f"Appended {len(new_rows)} rows to in-memory DataFrame.")
     return df
 
+
 def dataset_extract(id, version):
     """Extracts dataset information."""
     dataset_web = Dataset(module_id=id, version=version)
@@ -220,6 +221,7 @@ def process_yaml(yaml_file, df):
         print(f"Error processing {yaml_file}: {e}")
     finally:
         return df
+
 
 def process_multiple_yamls(yaml_directory, headers):
     # Write headers to the CSV file only once
@@ -278,6 +280,7 @@ def merge_benchmark_data(df, cpu_benchmark_df, gpu_benchmark_df):
 
     return df
 
+
 def fuzzy_match_device(device_name, benchmark_df, column_name, threshold=40):
     """
     Performs fuzzy matching to find the best match for a given device name in the benchmark DataFrame.
@@ -305,28 +308,19 @@ def main(yaml_directory, headers):
     """Main function to process multiple zip files and write results to a CSV."""
     df = process_multiple_yamls(yaml_directory, headers)
     print(df)
+
     # Merge benchmark data with the final CSV
-    cpu_benchmark_csv = os.path.join(os.path.dirname(__file__), 'HWBench', 'GeekbenchCPU.csv')
-    gpu_benchmark_csv = os.path.join(os.path.dirname(__file__), 'HWBench', 'geekbenchopencl-gpu.csv')
+    cpu_benchmark_csv = os.path.join(os.path.dirname(__file__), '..', 'HWBench', 'GeekbenchCPU.csv')
+    gpu_benchmark_csv = os.path.join(os.path.dirname(__file__), '..', 'HWBench', 'geekbenchopencl-gpu.csv')
     
     print(f"Loading CPU benchmark data from {cpu_benchmark_csv}")
     print(f"Loading GPU benchmark data from {gpu_benchmark_csv}")
     cpu_benchmark_df = pd.read_csv(cpu_benchmark_csv)
     gpu_benchmark_df = pd.read_csv(gpu_benchmark_csv)
     merged_df = merge_benchmark_data(df, cpu_benchmark_df, gpu_benchmark_df)
+
     return merged_df
-    # output_path = "merged_output.csv"
-    # merged_df.to_csv(output_path, index=False)
 
-
-# Select and fetch the Context
-#context1: Context = Context(module_id=2, version=1)
-
-# Run selected Context
-
-# Print Run execution results
-
-# Publish the Run
 
 # Headers for the DataFrame
 headers = [
@@ -340,6 +334,7 @@ headers = [
     "HW.MemoryTotal", "HW.StorageTotal", "SW.Platform", "Time.Duration",
     "SW.PythonVersion"
 ]
+
 
 # Only run if this file is executed directly, not when imported
 if __name__ == "__main__":

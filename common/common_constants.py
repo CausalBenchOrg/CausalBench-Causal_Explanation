@@ -5,3 +5,4 @@ SEND_AS_EMAIL = "register@causalbench.org"
 REPLY_TO_ADDRESS = "contact@causalbench.org"
 EMAIL_PASSWORD = ""
 TEMP_DIR = "/tmp"
+RANDOM_SEED = 42
