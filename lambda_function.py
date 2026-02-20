@@ -1,16 +1,15 @@
 import atexit
 from collections import defaultdict
 import os
-import yaml
 from helper_services.causal_analysis_helper import run_causal_analysis
 import math
 from helper_services.causal_recommendation_helper import run_causal_recommendation
 from helper_services.download_helper import download_files
-from helper_services.pdf_helper import generate_pdf
+from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
 from helper_services.mail_helper import send_email
 import numpy as np
-from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
+from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
 
 
 def handler(event, context):
@@ -60,15 +59,8 @@ def handler(event, context):
             print(f"Causal Recommendation {group_data['recommendations']}!")
 
         del group_data['data']
-
-    # save to file
-    output_filename = os.path.join(TEMP_DIR, "causal_analysis_results.yaml")
-    with open(output_filename, 'w') as yaml_file:
-        yaml.dump(causal_analysis_results, yaml_file, default_flow_style=False, indent=4, sort_keys=False)
-
-    print(f"Results saved to {output_filename}")
     
-    pdf_filepath, xlsx_filepath = generate_pdf(outcome_column, causal_analysis_results, event.get('unique_id'), event.get('run_ids'), event.get('filters'))
+    yaml_filepath, pdf_filepath, xlsx_filepath = generate_report(outcome_column, causal_analysis_results, event.get('unique_id'), event.get('run_ids'), event.get('filters'))
 
     attachments = [pdf_filepath]
     if os.path.exists(xlsx_filepath):
@@ -79,10 +71,10 @@ def handler(event, context):
     except Exception as e:
         print(f"Error sending email: {e}")
     
-    # remove the attachments after sending the email
-    for attachment in attachments:
-        if os.path.exists(attachment):
-            atexit.register(lambda: os.remove(attachment))
+    # # remove the attachments after sending the email
+    # for attachment in attachments:
+    #     if os.path.exists(attachment):
+    #         atexit.register(lambda path=attachment: os.remove(path))
     
     response = {
         "analysis_results": causal_analysis_results

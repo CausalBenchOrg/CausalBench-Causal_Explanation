@@ -1,4 +1,3 @@
-import atexit
 from collections import defaultdict
 import shutil
 import os
