@@ -1,6 +1,8 @@
 import atexit
 from collections import defaultdict
 import os
+
+import causalbench
 from helper_services.causal_analysis_helper import run_causal_analysis
 import math
 from helper_services.causal_recommendation_helper import run_causal_recommendation
@@ -13,6 +15,9 @@ from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
 
 
 def handler(event, context):
+    # set JWT token
+    causalbench.services.auth.__access_token = event.get('jwt_token', None)
+
     # maximum recommended points
     max_points = max(math.ceil(np.sqrt(len(event.get('zip_urls', [])))), 50)
 
