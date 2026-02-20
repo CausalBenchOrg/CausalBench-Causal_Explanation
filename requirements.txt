@@ -10,3 +10,4 @@ rapidfuzz
 causalbench-asu==0.2.4
 urllib3
 reportlab
+openpyxl

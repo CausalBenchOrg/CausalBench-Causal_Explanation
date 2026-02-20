@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import yaml
 from helper_services.causal_analysis_helper import run_causal_analysis
 import math
@@ -13,7 +14,7 @@ from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
 
 def handler(event, context):
     # maximum recommended points
-    max_points = max(math.ceil(np.sqrt(len(event.get('zip_urls', [])))), 10)
+    max_points = max(math.ceil(np.sqrt(len(event.get('zip_urls', [])))), 50)
 
     # outcome column
     outcome_column = event.get('outcome_column', 'Time.Duration')
@@ -49,7 +50,7 @@ def handler(event, context):
             if len(dimensions) > 0:
                 cols = ["HP." + dim for dim in dimensions.keys()]
                 data = list(group_data["data"][cols].itertuples(index=False, name=None))
-                group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)[0]
+                group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)
             else:
                 print(f"Skipping Causal Recommendation for {group} as len(dimensions) == 0.")
         except Exception as e:
@@ -60,16 +61,17 @@ def handler(event, context):
         group_data['data'] = len(group_data['data'])
 
     # save to file
-    output_filename=f'{TEMP_DIR}/causal_analysis_results.yaml'
+    output_filename = os.path.join(TEMP_DIR, "causal_analysis_results.yaml")
     with open(output_filename, 'w') as yaml_file:
         yaml.dump(causal_analysis_results, yaml_file, default_flow_style=False, indent=4, sort_keys=False)
 
     print(f"Results saved to {output_filename}")
     
-    pdf_filename = generate_pdf(outcome_column, causal_analysis_results, event.get('unique_id'), event.get('run_ids'), event.get('filters'))
+    pdf_filepath, xlsx_filepath = generate_pdf(outcome_column, causal_analysis_results, event.get('unique_id'), event.get('run_ids'), event.get('filters'))
 
-    # attachments = [pdf_filename, analysis_logger_file_name]
-    attachments = [pdf_filename]
+    attachments = [pdf_filepath]
+    if os.path.exists(xlsx_filepath):
+        attachments.append(xlsx_filepath)
     
     try:
         send_email(event.get('user_email'), "[CausalBench] Causal Analysis Results", CAUSAL_ANALYSIS_EMAIL_BODY, attachments=attachments)

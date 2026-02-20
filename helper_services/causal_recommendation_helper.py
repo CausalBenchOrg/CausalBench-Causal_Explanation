@@ -1,5 +1,4 @@
 import math
-import random
 import numpy as np
 import itertools
 from sklearn.preprocessing import StandardScaler
@@ -67,7 +66,7 @@ def generate_grid_points(dimensions, hp_dtypes):
     return grid_points
 
 
-def filter_recommendations(data, grid_points, max_points, threshold=0.2):
+def weight_recommendations(data, grid_points):
     # data and grid_points should be lists/arrays of shape (n_samples, n_features)
     scaler = StandardScaler()
     all_points = np.vstack([data, grid_points])
@@ -76,19 +75,13 @@ def filter_recommendations(data, grid_points, max_points, threshold=0.2):
     data_s = scaler.transform(data)
     grid_s = scaler.transform(grid_points)
 
-    filtered = []
+    grid_points_dist = []
     for gp, gp_s in zip(grid_points, grid_s):
         # compute distance to all current points in scaled space
-        dists = np.linalg.norm(data_s - gp_s, axis=1)
-        if np.all(dists >= threshold):  # keep if no current point is within threshold
-            filtered.append(gp)
+        min_dist = round(float(np.linalg.norm(data_s - gp_s, axis=1).min()), 8)
+        grid_points_dist.append(gp + (min_dist,))
 
-    # optionally limit results AFTER filtering
-    if len(filtered) > max_points:
-        rng = random.Random(RANDOM_SEED)
-        filtered = rng.sample(filtered, max_points)
-
-    return filtered
+    return grid_points_dist
 
 
 def run_causal_recommendation(data, dimensions, hp_dtypes, max_points):
@@ -105,10 +98,11 @@ def run_causal_recommendation(data, dimensions, hp_dtypes, max_points):
         int: total points used.
     """
     dimensions = distribute_points(dimensions, max_points)
-    grid_points = generate_grid_points(dimensions, hp_dtypes)
-    grid_points = filter_recommendations(data, grid_points, max_points)
-    grid_points = sorted(grid_points)
 
-    total_points = math.prod([dimensions[dim]['point_count'] for dim in dimensions])
+    grid_points = generate_grid_points(dimensions, hp_dtypes)
+
+    grid_points = weight_recommendations(data, grid_points)
+
+    grid_points = sorted(grid_points, key=lambda x: (-x[-1], x[:-1]))
     
-    return grid_points, total_points
+    return grid_points

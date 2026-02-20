@@ -14,7 +14,8 @@ from common.yaml_to_csv import main as process_yaml_data, headers
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 
-os.environ['MPLCONFIGDIR'] = f'{TEMP_DIR}/mplconfig'
+os.environ["MPLCONFIGDIR"] = os.path.join(TEMP_DIR, "mplconfig")
+
 
 def compute_CATE(data, treatment, outcome, graph):
     try:
@@ -228,15 +229,10 @@ def run_causal_analysis(download_dir,
     
     numeric_cols = [col for col in df.columns if col not in exclude_cols]
     numeric_cols = sorted(numeric_cols)
-    print(f"Numeric columns to be normalized: {numeric_cols}")
 
-    # if numeric_cols:
-    #     df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-    #     print("Features normalized using StandardScaler")
-    # else:
-    #     print("No numeric columns found to normalize")
-
-    if not numeric_cols:
+    if numeric_cols:
+        print(f"Numeric columns to be normalized: {numeric_cols}")
+    else:
         print("No numeric columns found to normalize")
 
     print(f"Processing {len(df)} total experiments")
@@ -268,7 +264,7 @@ def run_causal_analysis(download_dir,
                     
                     group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
 
-                    group_results[group_key]['summary'] = f"Effects on {metric} ({len(group_data)} experiments)"
+                    group_results[group_key]['experiments'] = len(analysis_data)
 
                     print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
                 except Exception as e:
@@ -296,7 +292,7 @@ def run_causal_analysis(download_dir,
                 
                 group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
 
-                group_results[group_key]['summary'] = f"Effects on {group_key} ({len(df)} experiments)"
+                group_results[group_key]['experiments'] = len(analysis_data)
 
                 print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
             except Exception as e:
