@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 import pandas as pd
@@ -72,7 +73,8 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
         parent=styles["BodyText"],
         alignment=TA_JUSTIFY,
         spaceBefore=0,
-        spaceAfter=10
+        spaceAfter=10,
+        leading=14
     )
     legend_style = ParagraphStyle(
         name="Legend",
@@ -167,54 +169,65 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
         # Process data
         for group, group_data in causal_analysis_results.items():
             table_data = [["Variable", "Effect", "Strength"]]
-            elements.append(Paragraph(f"<b>Analysis:</b> Effects on {group} ({group_data['experiments']} experiments)", header_style))
+
+            if group_data['experiments'] == 1:
+                elements.append(Paragraph(f"<b>Analysis:</b> Effects on {group} ({group_data['experiments']} experiment)", header_style))
+            else:
+                elements.append(Paragraph(f"<b>Analysis:</b> Effects on {group} ({group_data['experiments']} experiments)", header_style))
             
-            for k, v in group_data["effects"].items():
-                if abs(v) > 1000 or (abs(v) < 0.01 and v != 0):
-                    value_str = f"{v:.4e}"
-                else:
-                    value_str = f"{v:.4f}"
-                    
-                if v > 0:
-                    table_data.append([k, img_up, value_str])
-                elif v < 0:
-                    table_data.append([k, img_down, value_str])
-                else:
-                    table_data.append([k, img_zero, value_str])
-            
-            # Create the table
-            table = Table(table_data, colWidths="*", hAlign="LEFT", repeatRows=1)
+            if len(group_data["effects"]) == 0 or all(np.isnan(v) for v in group_data["effects"].values()):
+                elements.append(Paragraph("Insufficient data to perform causal analysis.", body_style))
+            else:
+                for k, v in group_data["effects"].items():
+                    if not np.isnan(v):
+                        if abs(v) > 1000 or (abs(v) < 0.01 and v != 0):
+                            value_str = f"{v:.4e}"
+                        else:
+                            value_str = f"{v:.4f}"
+                            
+                        if v > 0:
+                            table_data.append([k, img_up, value_str])
+                        elif v < 0:
+                            table_data.append([k, img_down, value_str])
+                        else:
+                            table_data.append([k, img_zero, value_str])
+                
+                # Create the table
+                table = Table(table_data, colWidths="*", hAlign="LEFT", repeatRows=1)
 
-            # Style the table
-            table_style = [
-                ("BACKGROUND", (0, 0), (-1, 0), tab_h_bg_col),
-                ("TEXTCOLOR", (0, 0), (-1, 0), tab_h_fg_col),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                # Style the table
+                table_style = [
+                    ("BACKGROUND", (0, 0), (-1, 0), tab_h_bg_col),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), tab_h_fg_col),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
 
-                # Column alignment
-                ("ALIGN", (0, 0), (0, -1), "LEFT"),
-                ("ALIGN", (1, 0), (1, -1), "CENTER"),
-                ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+                    # Column alignment
+                    ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                    ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                    ("ALIGN", (2, 0), (2, -1), "RIGHT"),
 
-                # Vertical alignment
-                ('VALIGN', (0, 0), (-1, -1), "MIDDLE"),
+                    # Vertical alignment
+                    ('VALIGN', (0, 0), (-1, -1), "MIDDLE"),
 
-                # Outer box
-                ("BOX", (0, 0), (-1, -1), 0.5, tab_h_bg_col),
-            ]
+                    # Outer box
+                    ("BOX", (0, 0), (-1, -1), 0.5, tab_h_bg_col),
+                ]
 
-            # Line below each row
-            for i in range(len(table_data) - 1):
-                table_style.append(("LINEBELOW", (0, i), (-1, i), 0.5, tab_h_bg_col))
+                # Line below each row
+                for i in range(len(table_data) - 1):
+                    table_style.append(("LINEBELOW", (0, i), (-1, i), 0.5, tab_h_bg_col))
 
-            table.setStyle(TableStyle(table_style))
-            
-            elements.append(table)
-            elements.append(spacer)
+                table.setStyle(TableStyle(table_style))
+                
+                elements.append(table)
+                elements.append(spacer)
 
             if len(group_data["recommendations"]) > 0:
                 elements.append(spacer)
-                elements.append(Paragraph(f'Top 5 additional hyperparameter settings to consider to better analyse the impact on <font color="{highlt_col}">{group}</font>:', body_style))
+                elements.append(Paragraph(
+                    f'Top 5 additional hyperparameter settings to consider to better analyse the impact on <font color="{highlt_col}">{group}</font>:',
+                    body_style
+                ))
                             
                 table_data = [['Hyperparameters'] + group_data['recommend_dims']]
 
@@ -297,7 +310,7 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
     else:
         run_ids = sorted(run_ids)
         run_ids = [str(run_id) for run_id in run_ids]
-        elements.append(Paragraph(f"{', '.join(run_ids)}", body_style))
+        elements.append(Paragraph(", ".join(run_ids), body_style))
     
     elements.append(separator)
     
@@ -308,7 +321,8 @@ def generate_pdf(outcome_column, causal_analysis_results, unique_id, run_ids, fi
 
     for k, v in filters.items():
         if len(v) > 0:
-            table_data.append([k, Paragraph(", ".join(v))])
+            v = [str(f) for f in v]
+            table_data.append([k, Paragraph(", ".join(v), body_style)])
 
     if len(table_data) == 0:
         elements.append(Paragraph("No filters applied.", body_style))

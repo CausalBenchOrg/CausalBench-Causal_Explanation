@@ -15,7 +15,7 @@ def start_smtp_connection(email, password):
     print(f"SMTP connection started: {str(time.time() - start)}")
     smtp_connection.starttls()
     print(f"TLS started: {str(time.time() - start)}")
-    smtp_connection.login(common_constants.EMAIL, common_constants.EMAIL_PASSWORD)
+    smtp_connection.login(email, password)
     print(f"Logged in: {str(time.time() - start)}")
     print("SMTP connection established.")
     print(smtp_connection)
@@ -28,7 +28,7 @@ def send_email(to: str, subject: str, body: str, attachments: list = None):
     print(f'To ID {str(to)}')
 
     message = MIMEMultipart()
-    message["From"] = f"CausalBench Admin <{common_constants.SEND_AS_EMAIL}>"
+    message["From"] = f"CausalBench Admin <{common_constants.EMAIL}>"
     message["To"] = to
     message["Subject"] = subject
     message.add_header('reply-to', common_constants.REPLY_TO_ADDRESS)

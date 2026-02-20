@@ -58,7 +58,7 @@ def handler(event, context):
         finally:
             print(f"Causal Recommendation {group_data['recommendations']}!")
 
-        group_data['data'] = len(group_data['data'])
+        del group_data['data']
 
     # save to file
     output_filename = os.path.join(TEMP_DIR, "causal_analysis_results.yaml")

@@ -32,12 +32,8 @@ def compute_CATE(data, treatment, outcome, graph):
         
         data_clean = data_clean.sort_values([treatment, outcome]).reset_index(drop=True)
         
-        if len(data_clean) < 3:
-            # return np.nan
-            return 0.0  # return 0 instead of nan
-            
-        if data_clean[treatment].std() == 0 or data_clean[outcome].std() == 0:
-            return 0.0
+        if data_clean[treatment].nunique() < 2 or data_clean[outcome].nunique() < 2:
+            return np.nan
         
         model = CausalModel(
             data=data_clean,
@@ -55,10 +51,10 @@ def compute_CATE(data, treatment, outcome, graph):
         )
 
         return estimate.value
+    
     except Exception as e:
         print(f"Error in CATE computation for {treatment} -> {outcome}: {e}")
-        # return np.nan
-        return 0.0  # return 0 instead of nan
+        return np.nan
 
 
 def compute_score(data, hyperparameters, outcome_column):
@@ -119,12 +115,6 @@ def run_causal_analysis(download_dir,
         'Metric.WriteBytes':['DS.Rows', 'DS.Cols', 'SW.', 'HP.', 'Model.'],
         'Metric.Memory':['DS.Rows', 'DS.Cols', 'SW.', 'HP.', 'Model.']
     }
-    
-    # if candidate_hyperparameters is None:
-    #     if outcome_column in outcome_column_mapping:
-    #         candidate_hyperparameters = None
-    #     else:
-    #         print("No candidate hyperparameters provided and no default mapping found")
     
     encode = []
     try:    
@@ -244,39 +234,10 @@ def run_causal_analysis(download_dir,
         print(f"Found {len(grouped)} unique metrics")
         
         for metric, group_data in grouped:
-            if len(group_data) > 1:
-                try:
-                    group_key = f"{metric}"
-
-                    analysis_data = group_data.reset_index(drop=True)
-
-                    group_results[group_key]['data'] = analysis_data.copy(deep=True)
-
-                    if numeric_cols:
-                        analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
-                        print("Features normalized using StandardScaler")
-                    
-                    score = compute_score(analysis_data, hyperparameters, 'outcome')
-                    
-                    for feature in score.index:
-                        effect_value = score.loc[feature, 'outcome']
-                        group_results[group_key]['effects'][feature] = round(float(effect_value), 8)
-                    
-                    group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
-
-                    group_results[group_key]['experiments'] = len(analysis_data)
-
-                    print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
-                except Exception as e:
-                    print(f"Error analyzing {metric}: {e}")
-                    continue
-        
-    else:
-        if len(df) > 1: 
             try:
-                group_key = outcome_column
+                group_key = f"{metric}"
 
-                analysis_data = df.drop(columns=['dataset'])
+                analysis_data = group_data.reset_index(drop=True)
 
                 group_results[group_key]['data'] = analysis_data.copy(deep=True)
 
@@ -295,7 +256,35 @@ def run_causal_analysis(download_dir,
                 group_results[group_key]['experiments'] = len(analysis_data)
 
                 print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
+            
             except Exception as e:
-                print(f"Error in causal analysis: {e}")
+                print(f"Error analyzing {metric}: {e}")
+    
+    else:
+        try:
+            group_key = outcome_column
+
+            analysis_data = df.drop(columns=['dataset'])
+
+            group_results[group_key]['data'] = analysis_data.copy(deep=True)
+
+            if numeric_cols:
+                analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
+                print("Features normalized using StandardScaler")
+            
+            score = compute_score(analysis_data, hyperparameters, 'outcome')
+            
+            for feature in score.index:
+                effect_value = score.loc[feature, 'outcome']
+                group_results[group_key]['effects'][feature] = round(float(effect_value), 8)
+            
+            group_results[group_key]['effects'] = dict(sorted(group_results[group_key]['effects'].items(), key=lambda x: abs(x[1]), reverse=True))
+
+            group_results[group_key]['experiments'] = len(analysis_data)
+
+            print(f"Analyzed {group_key}: {len(analysis_data)} experiments")
+        
+        except Exception as e:
+            print(f"Error in causal analysis: {e}")
 
     return group_results, download_dir
