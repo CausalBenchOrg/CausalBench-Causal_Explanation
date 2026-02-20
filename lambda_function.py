@@ -1,3 +1,4 @@
+import atexit
 from collections import defaultdict
 import os
 import yaml
@@ -78,10 +79,10 @@ def handler(event, context):
     except Exception as e:
         print(f"Error sending email: {e}")
     
-    # # remove the attachments after sending the email
-    # for attachment in attachments:
-    #     if os.path.exists(attachment):
-    #         os.remove(attachment)
+    # remove the attachments after sending the email
+    for attachment in attachments:
+        if os.path.exists(attachment):
+            atexit.register(lambda: os.remove(attachment))
     
     response = {
         "analysis_results": causal_analysis_results
