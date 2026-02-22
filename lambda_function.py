@@ -15,6 +15,12 @@ from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
 
 
 def handler(event, context):
+    # create fake home to ensure isolation
+    fake_home = os.path.abspath("home")
+    os.makedirs(fake_home, exist_ok=True)
+    os.environ["HOME"] = fake_home
+    os.environ["USERPROFILE"] = fake_home
+
     # set JWT token
     causalbench.services.auth.__access_token = event.get('jwt_token', None)
 
