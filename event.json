@@ -36,5 +36,6 @@
         "Task ID": [],
         "Task Version": [],
         "Time Elapsed": []
-    }
+    },
+    "jwt_token": null
 }

@@ -11,12 +11,12 @@ from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
 from helper_services.mail_helper import send_email
 import numpy as np
-from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
+from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
 
 
 def handler(event, context):
     # create fake home to ensure isolation
-    fake_home = os.path.abspath("home")
+    fake_home = os.path.abspath(os.path.join(TEMP_DIR, "home"))
     os.makedirs(fake_home, exist_ok=True)
     os.environ["HOME"] = fake_home
     os.environ["USERPROFILE"] = fake_home
