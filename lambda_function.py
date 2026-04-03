@@ -6,6 +6,7 @@ import causalbench
 from helper_services.causal_analysis_helper import run_causal_analysis
 import math
 from helper_services.causal_recommendation_helper import run_causal_recommendation
+from helper_services.g2s_causal_recommendation_helper import run_g2s_causal_recommendation
 from helper_services.download_helper import download_files
 from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
@@ -60,8 +61,10 @@ def handler(event, context):
         try:
             if len(dimensions) > 0:
                 cols = ["HP." + dim for dim in dimensions.keys()]
-                data = list(group_data["data"][cols].itertuples(index=False, name=None))
-                group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)
+                # data = list(group_data["data"][cols].itertuples(index=False, name=None))
+                # group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)
+                sample_frame = group_data["data"][cols + ["outcome"]].copy()
+                group_data['recommendations'] = run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_points)
             else:
                 print(f"Skipping Causal Recommendation for {group} as len(dimensions) == 0.")
         except Exception as e:

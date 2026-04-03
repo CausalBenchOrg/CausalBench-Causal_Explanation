@@ -4,6 +4,7 @@ scikit-learn
 dowhy
 pandas
 numpy
+scipy
 requests
 boto3
 rapidfuzz
