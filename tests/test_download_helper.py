@@ -21,7 +21,9 @@ class TestDownloadHelper(unittest.TestCase):
             with open(path, "rb") as file:
                 self.assertEqual(file.read(), b"abc123")
 
-    def test_download_zip_from_url_uses_fallback_filename_for_non_zip_path(self):
+    def test_download_zip_from_url_uses_fallback_filename_for_url_without_zip_extension(
+        self,
+    ):
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
         mock_response.iter_content = Mock(return_value=[b"x"])

@@ -19,8 +19,6 @@ class DummyFrame:
 
 class TestLambdaHandler(unittest.TestCase):
     def _import_lambda_module_with_stubs(self):
-        temp_dir = tempfile.gettempdir()
-
         fake_causalbench = types.ModuleType("causalbench")
         fake_causalbench.services = types.SimpleNamespace(
             auth=types.SimpleNamespace(__access_token=None)
@@ -31,7 +29,7 @@ class TestLambdaHandler(unittest.TestCase):
 
         fake_analysis_module = types.ModuleType("helper_services.causal_analysis_helper")
         fake_analysis_module.run_causal_analysis = (
-            lambda *args, **kwargs: ({}, temp_dir)
+            lambda *args, **kwargs: ({}, tempfile.gettempdir())
         )
 
         fake_reco_module = types.ModuleType("helper_services.causal_recommendation_helper")
@@ -45,7 +43,9 @@ class TestLambdaHandler(unittest.TestCase):
         )
 
         fake_download_module = types.ModuleType("helper_services.download_helper")
-        fake_download_module.download_files = lambda *args, **kwargs: (temp_dir, [])
+        fake_download_module.download_files = (
+            lambda *args, **kwargs: (tempfile.gettempdir(), [])
+        )
 
         fake_report_module = types.ModuleType("helper_services.report_helper")
         fake_report_module.generate_report = lambda *args, **kwargs: ("a.yml", "a.pdf", "a.xlsx")
