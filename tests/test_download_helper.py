@@ -55,7 +55,9 @@ class TestDownloadHelper(unittest.TestCase):
         self.assertEqual(download_mock.call_count, 2)
 
     def test_download_files_without_urls_returns_none(self):
-        self.assertIsNone(download_files([]))
+        with patch("helper_services.download_helper.fetch_zip_files") as fetch_mock:
+            self.assertIsNone(download_files([]))
+        fetch_mock.assert_not_called()
 
     def test_download_files_with_urls_returns_directory_and_files(self):
         with patch("helper_services.download_helper.tempfile.gettempdir", return_value="/tmp"), patch(

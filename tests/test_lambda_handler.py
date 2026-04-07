@@ -1,6 +1,7 @@
 import importlib
 import math
 import os
+from pathlib import Path
 import sys
 import tempfile
 import types
@@ -87,10 +88,8 @@ class TestLambdaHandler(unittest.TestCase):
             os.makedirs(download_dir, exist_ok=True)
             pdf_path = os.path.join(temp_dir, "out.pdf")
             xlsx_path = os.path.join(temp_dir, "out.xlsx")
-            with open(pdf_path, "wb"):
-                pass
-            with open(xlsx_path, "wb"):
-                pass
+            Path(pdf_path).touch()
+            Path(xlsx_path).touch()
 
             with patch.object(
                 lambda_module, "download_files", return_value=(download_dir, ["one.zip"])
