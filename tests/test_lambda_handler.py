@@ -81,6 +81,7 @@ class TestLambdaHandler(unittest.TestCase):
                 "recommendations": [],
             }
         }
+        download_dir = os.path.join(tempfile.gettempdir(), "download")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             pdf_path = os.path.join(temp_dir, "out.pdf")
@@ -91,11 +92,11 @@ class TestLambdaHandler(unittest.TestCase):
                 pass
 
             with patch.object(
-                lambda_module, "download_files", return_value=("/tmp/download", ["one.zip"])
+                lambda_module, "download_files", return_value=(download_dir, ["one.zip"])
             ) as download_mock, patch.object(
                 lambda_module, "get_hp_dtypes", return_value={"min_samples_leaf": "integer"}
             ) as dtypes_mock, patch.object(
-                lambda_module, "run_causal_analysis", return_value=(causal_results, "/tmp/download")
+                lambda_module, "run_causal_analysis", return_value=(causal_results, download_dir)
             ) as analysis_mock, patch.object(
                 lambda_module, "run_g2s_causal_recommendation", return_value=[{"delta": 1}]
             ) as reco_mock, patch.object(
@@ -130,7 +131,7 @@ class TestLambdaHandler(unittest.TestCase):
         )
 
         download_mock.assert_called_once()
-        dtypes_mock.assert_called_once_with("/tmp/download")
+        dtypes_mock.assert_called_once_with(download_dir)
         analysis_mock.assert_called_once()
         reco_mock.assert_called_once()
         report_mock.assert_called_once()
