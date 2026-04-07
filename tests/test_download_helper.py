@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 from helper_services.download_helper import download_files, download_zip_from_url, fetch_zip_files
 
 
-class DownloadHelperTests(unittest.TestCase):
+class TestDownloadHelper(unittest.TestCase):
     def test_download_zip_from_url_uses_filename_from_url(self):
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
