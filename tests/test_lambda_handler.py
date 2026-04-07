@@ -81,8 +81,10 @@ class TestLambdaHandler(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             pdf_path = os.path.join(temp_dir, "out.pdf")
             xlsx_path = os.path.join(temp_dir, "out.xlsx")
-            open(pdf_path, "wb").close()
-            open(xlsx_path, "wb").close()
+            with open(pdf_path, "wb"):
+                pass
+            with open(xlsx_path, "wb"):
+                pass
 
             with patch.object(
                 lambda_module, "download_files", return_value=("/tmp/download", ["one.zip"])

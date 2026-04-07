@@ -57,6 +57,19 @@ class TestDownloadHelper(unittest.TestCase):
     def test_download_files_without_urls_returns_none(self):
         self.assertIsNone(download_files([]))
 
+    def test_download_files_with_urls_returns_directory_and_files(self):
+        with patch("helper_services.download_helper.tempfile.gettempdir", return_value="/tmp"), patch(
+            "helper_services.download_helper.fetch_zip_files",
+            return_value=["/tmp/causal_analysis_fixed/a.zip"],
+        ) as fetch_mock:
+            download_dir, downloaded_files = download_files(["https://example.com/a.zip"])
+
+        self.assertEqual(download_dir, "/tmp/causal_analysis_fixed")
+        self.assertEqual(downloaded_files, ["/tmp/causal_analysis_fixed/a.zip"])
+        fetch_mock.assert_called_once_with(
+            ["https://example.com/a.zip"], "/tmp/causal_analysis_fixed"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
