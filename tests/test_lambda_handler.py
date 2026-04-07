@@ -74,7 +74,26 @@ class TestLambdaHandler(unittest.TestCase):
         return module
 
     def test_handler_returns_analysis_and_sends_attachments(self):
+        original_home = os.environ.get("HOME")
+        original_userprofile = os.environ.get("USERPROFILE")
+        self.addCleanup(
+            lambda: (
+                os.environ.__setitem__("HOME", original_home)
+                if original_home is not None
+                else os.environ.pop("HOME", None)
+            )
+        )
+        self.addCleanup(
+            lambda: (
+                os.environ.__setitem__("USERPROFILE", original_userprofile)
+                if original_userprofile is not None
+                else os.environ.pop("USERPROFILE", None)
+            )
+        )
+
         lambda_module = self._import_lambda_module_with_stubs()
+        self.addCleanup(lambda: sys.modules.pop("lambda_function", None))
+
         causal_results = {
             "Metric.Score": {
                 "effects": {"HP.min_samples_leaf": 0.8, "HP.max_features": 0},
