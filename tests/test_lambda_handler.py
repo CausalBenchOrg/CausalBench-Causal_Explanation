@@ -81,9 +81,10 @@ class TestLambdaHandler(unittest.TestCase):
                 "recommendations": [],
             }
         }
-        download_dir = os.path.join(tempfile.gettempdir(), "download")
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            download_dir = os.path.join(temp_dir, "download")
+            os.makedirs(download_dir, exist_ok=True)
             pdf_path = os.path.join(temp_dir, "out.pdf")
             xlsx_path = os.path.join(temp_dir, "out.xlsx")
             with open(pdf_path, "wb"):
@@ -129,6 +130,7 @@ class TestLambdaHandler(unittest.TestCase):
             os.path.normpath(os.environ["USERPROFILE"]),
             os.path.normpath(expected_home),
         )
+        self.assertTrue(os.path.isdir(expected_home))
 
         download_mock.assert_called_once()
         dtypes_mock.assert_called_once_with(download_dir)
