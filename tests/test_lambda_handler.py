@@ -18,6 +18,8 @@ class DummyFrame:
 
 class TestLambdaHandler(unittest.TestCase):
     def _import_lambda_module_with_stubs(self):
+        temp_dir = tempfile.gettempdir()
+
         fake_causalbench = types.ModuleType("causalbench")
         fake_causalbench.services = types.SimpleNamespace(
             auth=types.SimpleNamespace(__access_token=None)
@@ -27,7 +29,9 @@ class TestLambdaHandler(unittest.TestCase):
         fake_numpy.sqrt = math.sqrt
 
         fake_analysis_module = types.ModuleType("helper_services.causal_analysis_helper")
-        fake_analysis_module.run_causal_analysis = lambda *args, **kwargs: ({}, "/tmp")
+        fake_analysis_module.run_causal_analysis = (
+            lambda *args, **kwargs: ({}, temp_dir)
+        )
 
         fake_reco_module = types.ModuleType("helper_services.causal_recommendation_helper")
         fake_reco_module.run_causal_recommendation = lambda *args, **kwargs: []
@@ -40,7 +44,7 @@ class TestLambdaHandler(unittest.TestCase):
         )
 
         fake_download_module = types.ModuleType("helper_services.download_helper")
-        fake_download_module.download_files = lambda *args, **kwargs: ("/tmp", [])
+        fake_download_module.download_files = lambda *args, **kwargs: (temp_dir, [])
 
         fake_report_module = types.ModuleType("helper_services.report_helper")
         fake_report_module.generate_report = lambda *args, **kwargs: ("a.yml", "a.pdf", "a.xlsx")
@@ -118,8 +122,12 @@ class TestLambdaHandler(unittest.TestCase):
             getattr(lambda_module.causalbench.services.auth, "__access_token"),
             "token-123",
         )
-        self.assertTrue(os.environ["HOME"].endswith("/tmp/home"))
-        self.assertTrue(os.environ["USERPROFILE"].endswith("/tmp/home"))
+        expected_home = os.path.join(tempfile.gettempdir(), "home")
+        self.assertEqual(os.path.normpath(os.environ["HOME"]), os.path.normpath(expected_home))
+        self.assertEqual(
+            os.path.normpath(os.environ["USERPROFILE"]),
+            os.path.normpath(expected_home),
+        )
 
         download_mock.assert_called_once()
         dtypes_mock.assert_called_once_with("/tmp/download")
