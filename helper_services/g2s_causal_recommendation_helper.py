@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 from scipy.spatial import Delaunay
-from sklearn.preprocessing import StandardScaler
 
 from common.common_constants import RANDOM_SEED
 
@@ -337,6 +336,61 @@ def _propose_1d_gradient_samples(samples_tri, values, discret_spl, new_budget, r
     return proposals
 
 
+def _score_1d_gradient_candidates(samples_tri, values, candidate_points):
+    if candidate_points.size == 0:
+        return np.zeros(0, dtype=float)
+
+    coords = samples_tri.reshape(-1).astype(float)
+    values = np.asarray(values, dtype=float).reshape(-1)
+
+    order = np.argsort(coords)
+    coords = coords[order]
+    values = values[order]
+
+    unique_coords, inverse = np.unique(coords, return_inverse=True)
+    unique_values = np.zeros(unique_coords.shape[0], dtype=float)
+    counts = np.zeros(unique_coords.shape[0], dtype=float)
+    for idx, group_idx in enumerate(inverse):
+        unique_values[group_idx] += values[idx]
+        counts[group_idx] += 1
+    unique_values = unique_values / np.maximum(counts, 1.0)
+
+    if unique_coords.shape[0] < 2:
+        return np.zeros(candidate_points.shape[0], dtype=float)
+
+    slopes = np.abs(np.diff(unique_values) / np.maximum(np.diff(unique_coords), 1e-12))
+    interval_ids = np.searchsorted(unique_coords, candidate_points.reshape(-1), side="right") - 1
+    interval_ids = np.clip(interval_ids, 0, slopes.shape[0] - 1)
+    return slopes[interval_ids]
+
+
+def _score_gradient_candidates(samples_tri, gradients, candidate_points, dim_weights=None, causal_mode=0):
+    if candidate_points.size == 0:
+        return np.zeros(0, dtype=float)
+
+    if gradients.ndim == 1:
+        return np.abs(gradients).astype(float)
+
+    local_dim_weights = None if dim_weights is None else np.asarray(dim_weights, dtype=float).reshape(-1)
+    apply_weighted_norm = local_dim_weights is not None and causal_mode in (0, 2)
+
+    linear_interp = LinearNDInterpolator(samples_tri, gradients, fill_value=np.nan)
+    grad_values = linear_interp(candidate_points)
+
+    grad_values = np.asarray(grad_values, dtype=float)
+    if grad_values.ndim == 1:
+        grad_values = grad_values.reshape(-1, gradients.shape[1])
+
+    missing = np.isnan(grad_values).any(axis=1)
+    if np.any(missing):
+        nearest_interp = NearestNDInterpolator(samples_tri, gradients)
+        grad_values[missing] = nearest_interp(candidate_points[missing])
+
+    if apply_weighted_norm:
+        return np.sqrt(np.sum((grad_values * local_dim_weights) ** 2, axis=1))
+    return np.linalg.norm(grad_values, axis=1)
+
+
 def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_output, rng, causal_weights=None, causal_mode=0):
     samples_tri = samples_output[:, np.array(split) - 1]
     weighted_means = samples_output[:, -1]
@@ -353,11 +407,13 @@ def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_outp
     local_dim_weights = None if causal_weights is None else np.asarray(causal_weights)[np.array(split) - 1]
 
     if ndim_spl == 1:
-        return _propose_1d_gradient_samples(samples_tri, averaged_values, discret_spl, total_budget, rng)
+        proposed = _propose_1d_gradient_samples(samples_tri, averaged_values, discret_spl, total_budget, rng)
+        scores = _score_1d_gradient_candidates(samples_tri, averaged_values, proposed)
+        return proposed, scores
 
     min_required = ndim_spl + 1
     if samples_tri.shape[0] < min_required:
-        return np.zeros((0, ndim_spl), dtype=float)
+        return np.zeros((0, ndim_spl), dtype=float), np.zeros(0, dtype=float)
 
     try:
         tri = Delaunay(samples_tri)
@@ -371,21 +427,33 @@ def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_outp
             dim_weights=local_dim_weights,
             causal_mode=causal_mode,
         )
-        return samples_tri_prop
+        scores = _score_gradient_candidates(
+            samples_tri=samples_tri,
+            gradients=gradients,
+            candidate_points=samples_tri_prop,
+            dim_weights=local_dim_weights,
+            causal_mode=causal_mode,
+        )
+        return samples_tri_prop, scores
     except Exception as e:
         print(f"Skipping recommendations for split {split}: {e}")
-        return np.zeros((0, ndim_spl), dtype=float)
+        return np.zeros((0, ndim_spl), dtype=float), np.zeros(0, dtype=float)
 
 
-def _merge_subspace_samples(split_samples, splits, n_dims, taken_keys):
+def _merge_subspace_samples(split_samples, split_scores, splits, n_dims, taken_keys):
     if any(sample is None or sample.size == 0 for sample in split_samples):
-        return np.zeros((0, n_dims), dtype=float), taken_keys
+        return np.zeros((0, n_dims), dtype=float), np.zeros(0, dtype=float), taken_keys
 
     merged_rows = []
-    for row_group in itertools.product(*split_samples):
+    merged_scores = []
+    split_entries = [list(zip(samples, scores)) for samples, scores in zip(split_samples, split_scores)]
+    for row_group in itertools.product(*split_entries):
         x_full = np.zeros(n_dims, dtype=float)
+        total_score = 0.0
         for split_idx, split in enumerate(splits):
-            x_full[np.array(split) - 1] = row_group[split_idx]
+            sample_values, score = row_group[split_idx]
+            x_full[np.array(split) - 1] = sample_values
+            total_score += float(score)
 
         key = "_".join([f"{value:.12g}" for value in x_full])
         if key in taken_keys:
@@ -393,10 +461,11 @@ def _merge_subspace_samples(split_samples, splits, n_dims, taken_keys):
 
         taken_keys.add(key)
         merged_rows.append(x_full)
+        merged_scores.append(total_score)
 
     if not merged_rows:
-        return np.zeros((0, n_dims), dtype=float), taken_keys
-    return np.vstack(merged_rows), taken_keys
+        return np.zeros((0, n_dims), dtype=float), np.zeros(0, dtype=float), taken_keys
+    return np.vstack(merged_rows), np.asarray(merged_scores, dtype=float), taken_keys
 
 
 def _snap_to_domain(values, dim_name, dim_config, hp_dtypes):
@@ -408,22 +477,6 @@ def _snap_to_domain(values, dim_name, dim_config, hp_dtypes):
     if dtype == "integer":
         return np.round(clipped).astype(int)
     return clipped.astype(float)
-
-
-def _weighted_min_distances(existing_points, candidate_points, weights):
-    scaler = StandardScaler()
-    stacked = np.vstack([existing_points, candidate_points])
-    scaler.fit(stacked)
-
-    existing_scaled = scaler.transform(existing_points) * weights
-    candidate_scaled = scaler.transform(candidate_points) * weights
-
-    min_distances = []
-    for candidate in candidate_scaled:
-        distance = round(float(np.linalg.norm(existing_scaled - candidate, axis=1).min()), 8)
-        min_distances.append(distance)
-
-    return min_distances
 
 
 def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_points, causal_mode=0, random_seed=RANDOM_SEED):
@@ -439,7 +492,7 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
         random_seed (int): Random seed for reproducibility.
 
     Returns:
-        list[tuple]: Recommended points with trailing minimum weighted distance to observed samples.
+        list[tuple]: Recommended points with trailing estimated gradient score.
     """
     if not dimensions or max_points <= 0:
         return []
@@ -479,6 +532,7 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
     subspace_budget = max(1, int(np.ceil(max_points ** (1.0 / n_subspaces))))
 
     proposed_by_split = [None for _ in splits]
+    score_by_split = [None for _ in splits]
     for i in range(len(splits)):
         split, ndim_spl, discret_spl, _ = _get_split_information(
             splits,
@@ -487,7 +541,7 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
             dims_left_run,
             i,
         )
-        proposed_by_split[i] = _execute_strategy_1(
+        proposed_by_split[i], score_by_split[i] = _execute_strategy_1(
             ndim_spl=ndim_spl,
             discret_spl=discret_spl,
             total_budget=subspace_budget,
@@ -498,7 +552,13 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
             causal_mode=causal_mode,
         )
 
-    merged_points, _ = _merge_subspace_samples(proposed_by_split, splits, len(dim_names), taken)
+    merged_points, merged_scores, _ = _merge_subspace_samples(
+        proposed_by_split,
+        score_by_split,
+        splits,
+        len(dim_names),
+        taken,
+    )
     if merged_points.size == 0:
         return []
 
@@ -514,18 +574,23 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
     if candidate_df.empty:
         return []
 
+    score_df = pd.DataFrame(candidate_points, columns=dim_names)
+    score_df["gradient_score"] = merged_scores
+    score_df = score_df.groupby(dim_names, as_index=False)["gradient_score"].max()
+    candidate_df = candidate_df.merge(score_df, on=dim_names, how="left")
+
     candidate_points = candidate_df.to_numpy(dtype=float)
-    min_distances = _weighted_min_distances(existing_points, candidate_points, causal_weights)
 
     ranked = []
-    for point, min_distance in zip(candidate_points, min_distances):
+    for row in candidate_df.itertuples(index=False):
         values = []
-        for idx, dim_name in enumerate(dim_names):
+        for dim_name in dim_names:
+            point_value = getattr(row, dim_name)
             if hp_dtypes.get(dim_name) == "integer":
-                values.append(int(round(point[idx])))
+                values.append(int(round(point_value)))
             else:
-                values.append(round(float(point[idx]), 8))
-        ranked.append(tuple(values + [min_distance]))
+                values.append(round(float(point_value), 8))
+        ranked.append(tuple(values + [round(float(row.gradient_score), 8)]))
 
     ranked = sorted(ranked, key=lambda row: (-row[-1], row[:-1]))
     return ranked[:max_points]
