@@ -592,8 +592,10 @@ def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_outp
     """Run the fork's simplified gradient-based strategy for one subspace.
 
     This helper intentionally mirrors MATLAB's ``execute_strategy.m`` in name
-    and role, but only retains the stripped-down gradient-driven path used by
-    this causal recommendation fork.
+    and role. In the original G2S algorithm, ``execute_strategy.m`` supports
+    three strategy families: gradient-based, reconstruction-error-based, and
+    gradient-of-error-based sampling. This fork strips that down to only the
+    strategy-1 gradient-based path for causal recommendation generation.
 
     Args:
         ndim_spl (int): Dimensionality of the active split.
