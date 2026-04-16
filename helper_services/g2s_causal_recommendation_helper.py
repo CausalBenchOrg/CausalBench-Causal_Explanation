@@ -200,6 +200,18 @@ def _estimate_gradient(tri, samples, criticality=None):
     return grad_v
 
 
+def _prepare_local_dim_weights(dim_weights, n_dims):
+    if dim_weights is None:
+        return None
+
+    local_dim_weights = np.asarray(dim_weights, dtype=float).reshape(-1)
+    if local_dim_weights.size != n_dims:
+        raise ValueError("dim_weights must match the current subspace dimensionality")
+    if np.any(local_dim_weights <= 0):
+        raise ValueError("dim_weights must be strictly positive")
+    return local_dim_weights / np.mean(local_dim_weights)
+
+
 def _propose_samples_new4(samples_tri, values, new_budget, discret_spl, rng, dim_weights=None, causal_mode=0):
     t_mix = 1.0
     sigma_fac = 0.02
@@ -214,15 +226,9 @@ def _propose_samples_new4(samples_tri, values, new_budget, discret_spl, rng, dim
     lower_bounds = np.array([values_arr[0] for values_arr in discret_spl], dtype=float)
     upper_bounds = np.array([values_arr[-1] for values_arr in discret_spl], dtype=float)
 
-    if dim_weights is None:
+    local_dim_weights = _prepare_local_dim_weights(dim_weights, n_dims)
+    if local_dim_weights is None:
         local_dim_weights = np.ones(n_dims, dtype=float)
-    else:
-        local_dim_weights = np.asarray(dim_weights, dtype=float).reshape(-1)
-        if local_dim_weights.size != n_dims:
-            raise ValueError("dim_weights must match the current subspace dimensionality")
-        if np.any(local_dim_weights <= 0):
-            raise ValueError("dim_weights must be strictly positive")
-        local_dim_weights = local_dim_weights / np.mean(local_dim_weights)
 
     apply_weighted_norm = dim_weights is not None and causal_mode in (0, 2)
     apply_anisotropic_proposal = dim_weights is not None and causal_mode in (0, 1)
@@ -368,10 +374,7 @@ def _score_gradient_candidates(samples_tri, gradients, candidate_points, dim_wei
     if candidate_points.size == 0:
         return np.zeros(0, dtype=float)
 
-    if gradients.ndim == 1:
-        return np.abs(gradients).astype(float)
-
-    local_dim_weights = None if dim_weights is None else np.asarray(dim_weights, dtype=float).reshape(-1)
+    local_dim_weights = _prepare_local_dim_weights(dim_weights, gradients.shape[1])
     apply_weighted_norm = local_dim_weights is not None and causal_mode in (0, 2)
 
     linear_interp = LinearNDInterpolator(samples_tri, gradients, fill_value=np.nan)
@@ -513,7 +516,6 @@ def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_point
 
     rng = np.random.default_rng(random_seed)
     causal_weights = np.array([max(abs(dimensions[name]["strength"]), 1e-6) for name in dim_names], dtype=float)
-    causal_weights = causal_weights / np.mean(causal_weights)
 
     discret = []
     for name in dim_names:
