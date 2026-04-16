@@ -9,6 +9,16 @@ from common.common_constants import RANDOM_SEED
 
 
 def _number_subspaces(n_dims):
+    """Return the number of 3D and 2D subspaces needed for ``n_dims``.
+
+    This helper intentionally mirrors the role of MATLAB's ``number_subsp.m``.
+
+    Args:
+        n_dims (int): Total dimensionality of the full parameter space.
+
+    Returns:
+        tuple[int, int]: Counts of ``(n_subspaces_of_size_3, n_subspaces_of_size_2)``.
+    """
     if n_dims % 3 == 0:
         return n_dims // 3, 0
     if n_dims % 3 == 1:
@@ -17,34 +27,61 @@ def _number_subspaces(n_dims):
 
 
 def _create_subspaces(n_dims):
+    """Partition dimensions into non-overlapping 2D/3D subspaces.
+
+    This helper intentionally mirrors MATLAB's ``create_subspaces.m``, but this
+    Python fork returns 0-based dimension indices to match NumPy indexing.
+
+    Args:
+        n_dims (int): Number of dimensions in the full parameter space.
+
+    Returns:
+        list[list[int]]: A list of subspaces, where each subspace is a list of
+        0-based dimension indices.
+    """
     if 0 < n_dims <= 3:
-        return [list(range(1, n_dims + 1))]
+        return [list(range(n_dims))]
     if n_dims <= 0:
         raise ValueError("n_dims must be positive")
 
     n_sub3, n_sub2 = _number_subspaces(n_dims)
     splits = []
-    for i in range(1, n_sub3 + 1):
-        splits.append([3 * i - 2, 3 * i - 1, 3 * i])
+    for i in range(n_sub3):
+        splits.append([3 * i, 3 * i + 1, 3 * i + 2])
 
     if n_sub2 == 1:
-        splits.append([3 * n_sub3 + 1, 3 * n_sub3 + 2])
+        splits.append([3 * n_sub3, 3 * n_sub3 + 1])
     elif n_sub2 == 2:
-        splits.append([3 * n_sub3 + 1, 3 * n_sub3 + 2])
-        splits.append([3 * n_sub3 + 3, 3 * n_sub3 + 4])
+        splits.append([3 * n_sub3, 3 * n_sub3 + 1])
+        splits.append([3 * n_sub3 + 2, 3 * n_sub3 + 3])
 
     return splits
 
 
 def _initialize_splits(splits, discret):
+    """Prepare per-split metadata used during recommendation generation.
+
+    This helper intentionally mirrors MATLAB's ``initialize_splits.m``.
+
+    Args:
+        splits (list[list[int]]): Subspace definitions with 0-based dimension
+            indices.
+        discret (list[np.ndarray]): Per-dimension domain bounds or discrete
+            grids in full-space order.
+
+    Returns:
+        tuple[list[int], list[list[np.ndarray]], list[list[int]]]:
+            ``ndims_run`` stores each split dimensionality, ``discrets_run``
+            stores the domain description for each split, and ``dims_left_run``
+            stores the dimensions not present in each split.
+    """
     ndims_run = []
     discrets_run = []
     dims_left_run = []
 
     for i, split in enumerate(splits):
-        split_idx = [s - 1 for s in split]
-        discrets_run.append([discret[k] for k in split_idx])
-        ndims_run.append(len(split_idx))
+        discrets_run.append([discret[k] for k in split])
+        ndims_run.append(len(split))
 
         before = sorted([d for ii, sp in enumerate(splits) if ii < i for d in sp])
         after = sorted([d for ii, sp in enumerate(splits) if ii > i for d in sp])
@@ -54,6 +91,22 @@ def _initialize_splits(splits, discret):
 
 
 def _get_split_information(splits, ndims_run, discrets_run, dims_left_run, i):
+    """Return the cached metadata for a single split.
+
+    This helper intentionally mirrors MATLAB's ``get_split_information.m``.
+
+    Args:
+        splits (list[list[int]]): Subspace definitions.
+        ndims_run (list[int]): Cached split dimensionalities.
+        discrets_run (list[list[np.ndarray]]): Cached split domains.
+        dims_left_run (list[list[int]]): Cached complementary dimensions.
+        i (int): Split index to retrieve.
+
+    Returns:
+        tuple[list[int], int, list[np.ndarray], list[int]]: The selected split,
+        its dimensionality, its domain description, and the dimensions outside
+        that split.
+    """
     return (
         splits[i],
         ndims_run[i],
@@ -63,12 +116,39 @@ def _get_split_information(splits, ndims_run, discrets_run, dims_left_run, i):
 
 
 def _choose_num_centres(weights, new_budget, cov_t=0.9, alpha=2.0):
+    """Choose how many KDE centers to keep from weighted anchor points.
+
+    This helper intentionally mirrors MATLAB's ``chooseNumCentres.m``.
+
+    Args:
+        weights (np.ndarray): Non-negative normalized weights for anchor points.
+        new_budget (int): Number of new proposals to generate.
+        cov_t (float): Target cumulative weight coverage threshold.
+        alpha (float): Maximum proposal-to-center ratio control.
+
+    Returns:
+        int: Number of centers to sample from.
+    """
     w_sorted = np.sort(weights)[::-1]
     k_cov = int(np.searchsorted(np.cumsum(w_sorted), cov_t) + 1)
     return int(min(int(np.ceil(new_budget / alpha)), k_cov))
 
 
 def _solid_angle_triangle(point, va, vb, vc):
+    """Compute the solid angle subtended by a triangle at a query point.
+
+    This helper intentionally mirrors MATLAB's ``Solid_Angle_Triangle.m``.
+    It is used by the 3D vertex-gradient aggregation routine.
+
+    Args:
+        point (np.ndarray): Query point where the solid angle is measured.
+        va (np.ndarray): First triangle vertex.
+        vb (np.ndarray): Second triangle vertex.
+        vc (np.ndarray): Third triangle vertex.
+
+    Returns:
+        float: Signed solid angle in radians.
+    """
     r_pa = point - va
     r_pb = point - vb
     r_pc = point - vc
@@ -84,6 +164,25 @@ def _solid_angle_triangle(point, va, vb, vc):
 
 
 def _estimate_gradient(tri, samples, criticality=None):
+    """Estimate vertex gradients on a 2D or 3D simplicial mesh.
+
+    This helper intentionally mirrors MATLAB's ``estimate_gradient.m``. It
+    first estimates a gradient for each simplex, then aggregates simplex
+    gradients back to vertices using angle-based weighting.
+
+    Args:
+        tri (scipy.spatial.Delaunay): Delaunay triangulation of the sampled
+            points in the active 2D or 3D subspace.
+        samples (np.ndarray): Array of shape ``(n_points, n_dims + 1)`` where
+            the last column contains the scalar value associated with each
+            point.
+        criticality (np.ndarray | None): Optional alternative scalar values to
+            differentiate instead of the last column of ``samples``.
+
+    Returns:
+        np.ndarray: Array of shape ``(n_points, n_dims)`` containing one
+        estimated gradient vector per sampled point.
+    """
     n_dims = samples.shape[1] - 1
 
     if criticality is None:
@@ -201,6 +300,21 @@ def _estimate_gradient(tri, samples, criticality=None):
 
 
 def _prepare_local_dim_weights(dim_weights, n_dims):
+    """Validate and normalize split-local causal weights.
+
+    This helper does not have a direct MATLAB equivalent; it was added in this
+    fork so proposal and scoring share exactly the same weight-preparation
+    logic.
+
+    Args:
+        dim_weights (array-like | None): Optional positive weights for the
+            active subspace dimensions.
+        n_dims (int): Expected dimensionality of the active subspace.
+
+    Returns:
+        np.ndarray | None: Mean-normalized weights of shape ``(n_dims,)`` when
+        provided, otherwise ``None``.
+    """
     if dim_weights is None:
         return None
 
@@ -213,6 +327,34 @@ def _prepare_local_dim_weights(dim_weights, n_dims):
 
 
 def _propose_samples_new4(samples_tri, values, new_budget, discret_spl, rng, dim_weights=None, causal_mode=0):
+    """Generate new 2D/3D candidate points from weighted local anchors.
+
+    This helper intentionally mirrors MATLAB's ``propose_samples_NEW4.m``,
+    with causal-weight extensions added for this fork. It scores existing
+    anchors, selects high-mass centers, and draws new samples from a Gaussian
+    proposal in normalized split coordinates.
+
+    Args:
+        samples_tri (np.ndarray): Existing split-local sample coordinates with
+            shape ``(n_points, n_dims)``.
+        values (np.ndarray): Anchor scores, typically gradient vectors or
+            already-collapsed scalar criticality values.
+        new_budget (int): Number of new candidate points to generate.
+        discret_spl (list[np.ndarray]): Per-dimension bounds for the active
+            split.
+        rng (np.random.Generator): Random generator used for reproducible
+            proposals.
+        dim_weights (array-like | None): Optional causal weights for active
+            dimensions.
+        causal_mode (int): ``0`` enables weighted norms and anisotropic
+            proposals, ``1`` proposal-only weighting, and ``2`` norm-only
+            weighting.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: ``x_new`` contains the proposed points,
+        and ``x_new_val`` appends the interpolated scalar score used during
+        proposal generation.
+    """
     t_mix = 1.0
     sigma_fac = 0.02
     edge_cut = 0.025
@@ -286,6 +428,25 @@ def _propose_samples_new4(samples_tri, values, new_budget, discret_spl, rng, dim
 
 
 def _propose_1d_gradient_samples(samples_tri, values, discret_spl, new_budget, rng):
+    """Generate 1D proposals by sampling intervals with steep value changes.
+
+    This helper has no direct MATLAB counterpart in the original G2S code. It
+    exists in this fork because 1D subspaces are handled with a simpler
+    interval-slope sampler instead of the 2D/3D triangulation logic.
+
+    Args:
+        samples_tri (np.ndarray): Existing 1D sample coordinates of shape
+            ``(n_points, 1)`` or equivalent.
+        values (array-like): Scalar values observed at those coordinates.
+        discret_spl (list[np.ndarray]): Split domain bounds for the single
+            active dimension.
+        new_budget (int): Number of 1D proposals to generate.
+        rng (np.random.Generator): Random generator used for reproducible
+            proposals.
+
+    Returns:
+        np.ndarray: Proposed 1D points with shape ``(new_budget, 1)``.
+    """
     if samples_tri.size == 0:
         return np.zeros((0, 1), dtype=float)
 
@@ -343,6 +504,19 @@ def _propose_1d_gradient_samples(samples_tri, values, discret_spl, new_budget, r
 
 
 def _score_1d_gradient_candidates(samples_tri, values, candidate_points):
+    """Score 1D candidates by local slope magnitude.
+
+    This helper has no direct MATLAB counterpart in the original G2S code. It
+    supports the simplified 1D path used by this causal-recommendation fork.
+
+    Args:
+        samples_tri (np.ndarray): Existing 1D sample coordinates.
+        values (array-like): Scalar values observed at those coordinates.
+        candidate_points (np.ndarray): Proposed 1D candidates to score.
+
+    Returns:
+        np.ndarray: One non-negative slope-based score per candidate.
+    """
     if candidate_points.size == 0:
         return np.zeros(0, dtype=float)
 
@@ -371,6 +545,26 @@ def _score_1d_gradient_candidates(samples_tri, values, candidate_points):
 
 
 def _score_gradient_candidates(samples_tri, gradients, candidate_points, dim_weights=None, causal_mode=0):
+    """Score 2D/3D candidates by interpolated gradient magnitude.
+
+    This helper does not have a same-named MATLAB equivalent, but it follows
+    the same gradient-magnitude idea used in the original G2S strategy logic.
+    It interpolates vertex gradients at candidate points and converts them to a
+    scalar magnitude, optionally using causal dimension weights.
+
+    Args:
+        samples_tri (np.ndarray): Existing split-local sample coordinates.
+        gradients (np.ndarray): Gradient vectors estimated at ``samples_tri``.
+        candidate_points (np.ndarray): Proposed points to score.
+        dim_weights (array-like | None): Optional causal weights for active
+            dimensions.
+        causal_mode (int): ``0`` enables weighted norms and anisotropic
+            proposals, ``1`` proposal-only weighting, and ``2`` norm-only
+            weighting.
+
+    Returns:
+        np.ndarray: One scalar gradient-magnitude score per candidate.
+    """
     if candidate_points.size == 0:
         return np.zeros(0, dtype=float)
 
@@ -395,7 +589,34 @@ def _score_gradient_candidates(samples_tri, gradients, candidate_points, dim_wei
 
 
 def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_output, rng, causal_weights=None, causal_mode=0):
-    samples_tri = samples_output[:, np.array(split) - 1]
+    """Run the fork's simplified gradient-based strategy for one subspace.
+
+    This helper intentionally mirrors MATLAB's ``execute_strategy.m`` in name
+    and role, but only retains the stripped-down gradient-driven path used by
+    this causal recommendation fork.
+
+    Args:
+        ndim_spl (int): Dimensionality of the active split.
+        discret_spl (list[np.ndarray]): Domain description for the active
+            split.
+        total_budget (int): Number of candidates to generate in this split.
+        split (list[int]): 0-based indices of dimensions belonging to the
+            active split.
+        samples_output (np.ndarray): Observed full-space samples with the final
+            column holding the outcome value.
+        rng (np.random.Generator): Random generator used for reproducible
+            proposals.
+        causal_weights (array-like | None): Full-space causal weights, later
+            sliced down to the active split.
+        causal_mode (int): ``0`` enables weighted norms and anisotropic
+            proposals, ``1`` proposal-only weighting, and ``2`` norm-only
+            weighting.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Proposed split-local samples and their
+        associated scalar scores.
+    """
+    samples_tri = samples_output[:, np.array(split)]
     weighted_means = samples_output[:, -1]
 
     unique_points, inverse = np.unique(samples_tri, axis=0, return_inverse=True)
@@ -407,7 +628,7 @@ def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_outp
     averaged_values = averaged_values / np.maximum(counts, 1)
     samples_tri = unique_points
 
-    local_dim_weights = None if causal_weights is None else np.asarray(causal_weights)[np.array(split) - 1]
+    local_dim_weights = None if causal_weights is None else np.asarray(causal_weights)[np.array(split)]
 
     if ndim_spl == 1:
         proposed = _propose_1d_gradient_samples(samples_tri, averaged_values, discret_spl, total_budget, rng)
@@ -444,6 +665,25 @@ def _execute_strategy_1(ndim_spl, discret_spl, total_budget, split, samples_outp
 
 
 def _merge_subspace_samples(split_samples, split_scores, splits, n_dims, taken_keys):
+    """Combine one proposal from each split into full-dimensional candidates.
+
+    This helper has no direct MATLAB equivalent with the same name; it is part
+    of the simplified lifting logic used by this fork to turn split-local
+    proposals into full-space recommendations.
+
+    Args:
+        split_samples (list[np.ndarray]): Proposed samples for each split.
+        split_scores (list[np.ndarray]): Scalar scores corresponding to
+            ``split_samples``.
+        splits (list[list[int]]): 0-based split definitions.
+        n_dims (int): Full-space dimensionality.
+        taken_keys (set[str]): Serialized points that should not be emitted
+            again.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, set[str]]: Merged full-space candidates,
+        merged scores, and the updated ``taken_keys`` set.
+    """
     if any(sample is None or sample.size == 0 for sample in split_samples):
         return np.zeros((0, n_dims), dtype=float), np.zeros(0, dtype=float), taken_keys
 
@@ -455,7 +695,7 @@ def _merge_subspace_samples(split_samples, split_scores, splits, n_dims, taken_k
         total_score = 0.0
         for split_idx, split in enumerate(splits):
             sample_values, score = row_group[split_idx]
-            x_full[np.array(split) - 1] = sample_values
+            x_full[np.array(split)] = sample_values
             total_score += float(score)
 
         key = "_".join([f"{value:.12g}" for value in x_full])
@@ -472,6 +712,23 @@ def _merge_subspace_samples(split_samples, split_scores, splits, n_dims, taken_k
 
 
 def _snap_to_domain(values, dim_name, dim_config, hp_dtypes):
+    """Clip and cast candidate values back to the declared hyperparameter type.
+
+    This helper has no direct MATLAB equivalent. It adapts continuous proposal
+    outputs to the domain representation expected by the causal recommendation
+    pipeline.
+
+    Args:
+        values (np.ndarray): Candidate values for one dimension.
+        dim_name (str): Hyperparameter name, used only for consistency with the
+            surrounding pipeline.
+        dim_config (dict): Dimension metadata containing ``min_val`` and
+            ``max_val``.
+        hp_dtypes (dict): Mapping from dimension name to datatype label.
+
+    Returns:
+        np.ndarray: Domain-clipped values cast to integer or float as needed.
+    """
     min_val = dim_config["min_val"]
     max_val = dim_config["max_val"]
     dtype = hp_dtypes.get(dim_name)
@@ -484,7 +741,12 @@ def _snap_to_domain(values, dim_name, dim_config, hp_dtypes):
 
 def run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_points, causal_mode=0, random_seed=RANDOM_SEED):
     """
-    Generate new recommendations using the G2S sampler logic and the already observed samples.
+    Generate causal recommendations with a stripped-down G2S-inspired sampler.
+
+    This function does not correspond to a single MATLAB function. Instead, it
+    is the orchestration entry point for this forked implementation, combining
+    the MATLAB-inspired split/proposal logic with causal-strength weighting and
+    recommendation-specific post-processing.
 
     Args:
         sample_frame (pd.DataFrame): One column per recommended hyperparameter plus an ``outcome`` column.
