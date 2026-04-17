@@ -278,12 +278,12 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
 
                 mode = "a" if os.path.exists(xlsx_filepath) else "w"
                 with pd.ExcelWriter(xlsx_filepath, engine="openpyxl", mode=mode) as writer:
-                    reco_df = pd.DataFrame(group_data["recommendations"], columns=group_data['recommend_dims'] + ['Min. Dist. to Samples'])
+                    reco_df = pd.DataFrame(group_data["recommendations"], columns=group_data['recommend_dims'] + ['Gradient Score'])
                     reco_df.index = reco_df.index + 1
                     reco_df.to_excel(writer, sheet_name=group, index=True)
 
                     ws = writer.sheets[group]
-                    col_idx = reco_df.columns.get_loc("Min. Dist. to Samples") + 2
+                    col_idx = reco_df.columns.get_loc("Gradient Score") + 2
                     ws.cell(row=1, column=col_idx).font = Font(color="FF0000", bold=True)
 
                     for column_cells in ws.columns:
@@ -304,8 +304,8 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
                 elements.append(spacer)
                 elements.append(Paragraph(
                     f'Please view the complete list of recommended experiments in the sheet <font color="{highlt_col}">{group}</font> of the attached Excel file <font color="{highlt_col}">{xlsx_filename}</font>.'
-                    f' The column <font color="{highlt_col}">Min. Dist. to Samples</font> in the sheet specifies the minimum standardized Euclidean distance between each recommended experiment and the experiments already executed.'
-                    f' The recommended hyperparameter configurations are ranked based on the inverse of the distance, thereby prioritizing configurations that are furthest from those previously considered.',
+                    f' The column <font color="{highlt_col}">Gradient Score</font> in the sheet captures the estimated local outcome gradient around each recommendation.'
+                    f' The recommended hyperparameter configurations are ranked so that settings with stronger estimated local gradients are prioritized.',
                     body_style
                 ))
             

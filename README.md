@@ -1,25 +1,33 @@
-# CausalBench — Causal Explanation Lambda
+# CausalBench - Causal Explanation Lambda
 
-This repository provides the AWS Lambda implementation for **CausalBench**, a framework for causal analysis and recommendation.  
+This repository provides the AWS Lambda implementation for **CausalBench**, a framework for causal analysis and recommendation.
 It includes helper modules for causal scoring/explanations, conversion of YAML configs to CSV, and email delivery of results.
 
 ---
 
 ## Repository Structure
 
-```
+```text
 .
-├── lambda_function.py           # Lambda entrypoint (AWS handler)
-├── causal_analysis_helper.py    # Causal analysis utilities
-├── causal_recommendation_helper.py
-├── common_constants.py          # Configure env vars here (email ID, password)
-├── mail_services.py             # SMTP email sender
-├── mail_helper_services.py      # Email formatting and helpers
-├── yaml_to_csv.py               # Convert YAML files downloaded from causalbench.org to CSV
-├── media/                       # Static assets
-├── requirements.txt             # Python dependencies
-├── Dockerfile                   # Container build for AWS Lambda
-└── LICENSE                      # Apache 2.0
+├── lambda_function.py                           # Lambda entrypoint (AWS handler)
+├── event.json                                   # Sample local invocation payload
+├── test_invoke.py                               # Local Lambda invocation helper
+├── docker_commands.sh                           # Docker utility commands
+├── common/
+│   ├── common_constants.py                      # Shared constants/config
+│   └── yaml_to_csv.py                           # Convert YAML files to CSV
+├── helper_services/
+│   ├── causal_analysis_helper.py                # Causal analysis utilities
+│   ├── causal_recommendation_helper.py          # Legacy recommendation helper
+│   ├── g2s_causal_recommendation_helper.py      # Current G2S recommendation helper
+│   ├── download_helper.py
+│   ├── hp_dtype_helper.py
+│   ├── mail_helper.py                           # SMTP email sender
+│   └── report_helper.py
+├── images/                                      # Static assets
+├── requirements.txt                             # Python dependencies
+├── Dockerfile                                   # Container build for AWS Lambda
+└── LICENSE                                      # Apache 2.0
 ```
 
 ---
@@ -54,20 +62,14 @@ It includes helper modules for causal scoring/explanations, conversion of YAML c
 
 ## Usage
 
-### Convert YAML → CSV
+### Convert YAML to CSV
 ```bash
-python yaml_to_csv.py config.yaml --out out.csv
+python common/yaml_to_csv.py config.yaml --out out.csv
 ```
 
-### Run helpers locally
+### Invoke locally
 ```bash
-python causal_analysis_helper.py --input data.csv
-python causal_recommendation_helper.py --input data.csv
-```
-
-### Send a test email
-```bash
-python mail_services.py
+python test_invoke.py
 ```
 
 ---
@@ -93,8 +95,8 @@ This project supports deployment as a **container image**.
    - Create a Lambda function with image type.
    - Configure environment variables in the Lambda console.
 
-> If deploying as a zip instead, set handler to:  
-> `lambda_function.lambda_handler`
+> If deploying as a zip instead, set handler to:
+> `lambda_function.handler`
 
 ## License
 
