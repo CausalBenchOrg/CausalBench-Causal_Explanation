@@ -169,14 +169,16 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
 
     elements.append(separator)
 
-    if len(causal_analysis_results) == 0:
+    analysis_groups = {k: v for k, v in causal_analysis_results.items() if k != "_metadata"}
+
+    if len(analysis_groups) == 0:
         elements.append(Paragraph(f"<b>Analysis:</b> Effects on {outcome_column} (0 experiments)", header_style))
         elements.append(Paragraph("Insufficient data to perform causal analysis.", body_style))
         elements.append(separator)
-    
+
     else:
         # Process data
-        for group, group_data in causal_analysis_results.items():
+        for group, group_data in analysis_groups.items():
             table_data = [["Variable", "Effect", "Strength"]]
 
             if group_data['experiments'] == 1:

@@ -116,7 +116,10 @@ def run_causal_analysis(download_dir,
     }
     
     encode = []
-    try:    
+    raw_df = pd.DataFrame()
+    hyperparameters = []
+    experiment_count = 0
+    try:
         if download_dir:
             print(f"Processing ZIP files from {download_dir}")
             raw_df = process_yaml_data(download_dir, headers)
@@ -206,7 +209,8 @@ def run_causal_analysis(download_dir,
             print(label_encoder.classes_)
 
     df = df.dropna()
-    print(f"After cleaning: {len(df)} experiments remain")
+    experiment_count = len(df)
+    print(f"After cleaning: {experiment_count} experiments remain")
 
     df = df.sort_values(['dataset'] + [col for col in sorted(df.columns) if col != 'dataset']).reset_index(drop=True)
 
@@ -285,5 +289,34 @@ def run_causal_analysis(download_dir,
         
         except Exception as e:
             print(f"Error in causal analysis: {e}")
+
+    insufficient_data = False
+    insufficient_data_reason = None
+
+    if raw_df.empty:
+        insufficient_data = True
+        insufficient_data_reason = "No data files could be downloaded from provided URLs"
+    elif len(hyperparameters) == 0:
+        insufficient_data = True
+        insufficient_data_reason = "No hyperparameters with sufficient variation found"
+    elif experiment_count < 2:
+        insufficient_data = True
+        insufficient_data_reason = "Too few experiments after data cleaning (need ≥ 2)"
+    elif group_results:
+        all_nan = all(
+            all(np.isnan(v) for v in group_data.get("effects", {}).values())
+            for group_data in group_results.values()
+            if "effects" in group_data
+        )
+        if all_nan:
+            insufficient_data = True
+            insufficient_data_reason = "Causal effects could not be estimated (insufficient variation in data)"
+
+    group_results["_metadata"] = {
+        "experiment_count": experiment_count,
+        "hyperparameter_count": len(hyperparameters),
+        "insufficient_data": insufficient_data,
+        "insufficient_data_reason": insufficient_data_reason,
+    }
 
     return group_results, download_dir
