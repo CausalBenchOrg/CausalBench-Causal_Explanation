@@ -40,7 +40,7 @@ def build_email_body(causal_analysis_results, event):
             lines.append(f"Reason: {insufficient_data_reason}")
         lines.append("")
         lines.append("To get results, run more experiments with varied hyperparameter configurations.")
-        lines.append("Minimum requirements: ≥3 data points per variable, ≥2 unique values per hyperparameter.")
+        lines.append("Minimum requirements: ≥ 2 data points per variable, ≥ 2 unique values per hyperparameter.")
     else:
         all_effects = {}
         for group, group_data in causal_analysis_results.items():
