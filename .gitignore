@@ -3,3 +3,4 @@ __pycache__/
 tmp/
 common/common_constants.py
 home/
+.claude/*
