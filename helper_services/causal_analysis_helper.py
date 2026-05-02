@@ -1,19 +1,13 @@
 from collections import defaultdict
-import shutil
 import os
-import tempfile
 from urllib.parse import urlparse
 import pandas as pd
 import numpy as np
-import requests
 import networkx as nx
 from dowhy import CausalModel
-from common.common_constants import RANDOM_SEED, TEMP_DIR
+from common.common_constants import RANDOM_SEED
 from common.yaml_to_csv import main as process_yaml_data, headers
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-
-
-os.environ["MPLCONFIGDIR"] = os.path.join(TEMP_DIR, "mplconfig")
 
 
 def compute_CATE(data, treatment, outcome, graph):

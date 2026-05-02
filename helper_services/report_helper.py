@@ -1,4 +1,5 @@
 import os
+import tempfile
 import numpy as np
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
@@ -13,8 +14,6 @@ from datetime import datetime, timezone
 
 import yaml
 
-from common.common_constants import TEMP_DIR
-
 
 def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids, filters):
     # Set up parameters
@@ -23,7 +22,7 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
 
     # Create a YAML file
     yaml_filename = f"causal_analysis_results_{timestamp}-{unique_id}.yaml"
-    yaml_filepath = os.path.join(TEMP_DIR, yaml_filename)
+    yaml_filepath = os.path.join(tempfile.gettempdir(), yaml_filename)
     
     with open(yaml_filepath, 'w') as yaml_file:
         yaml.dump(causal_analysis_results, yaml_file, default_flow_style=False, indent=4, sort_keys=False)
@@ -32,7 +31,7 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
 
     # Create a PDF document
     pdf_filename = f"causal_explanation_report_{timestamp}-{unique_id}.pdf"
-    pdf_filepath = os.path.join(TEMP_DIR, pdf_filename)
+    pdf_filepath = os.path.join(tempfile.gettempdir(), pdf_filename)
     doc = SimpleDocTemplate(
         pdf_filepath,
         pagesize=LETTER,
@@ -44,7 +43,7 @@ def generate_report(outcome_column, causal_analysis_results, unique_id, run_ids,
 
     # Create an Excel file
     xlsx_filename = f"causal_recommendations_{timestamp}-{unique_id}.xlsx"
-    xlsx_filepath = os.path.join(TEMP_DIR, xlsx_filename)
+    xlsx_filepath = os.path.join(tempfile.gettempdir(), xlsx_filename)
 
     # Colors
     tab_h_bg_col = colors.HexColor("#95979d")    # table header background color

@@ -3,5 +3,4 @@ CAUSAL_ANALYSIS_EMAIL_BODY = "Please find the causal analysis results in the pdf
 EMAIL = "admin@causalbench.org"
 REPLY_TO_ADDRESS = "contact@causalbench.org"
 EMAIL_PASSWORD = ""
-TEMP_DIR = "/tmp"
 RANDOM_SEED = 42

@@ -1,6 +1,8 @@
 import atexit
 from collections import defaultdict
 import os
+from tempfile import tempdir
+import tempfile
 
 import causalbench
 from helper_services.causal_analysis_helper import run_causal_analysis
@@ -12,15 +14,35 @@ from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
 from helper_services.mail_helper import send_email
 import numpy as np
-from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY, TEMP_DIR
+from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
+
+
+
+def configure_env():
+    """
+    Directory setup to ensure isolation
+    """
+    # fake temporary directory
+    TEMP_DIR = tempfile.mkdtemp()
+    tempfile.tempdir = None
+    os.environ["TMPDIR"] = TEMP_DIR
+    os.environ["TEMP"] = TEMP_DIR
+    os.environ["TMP"] = TEMP_DIR
+
+    # fake home directory
+    HOME_DIR = os.path.join(TEMP_DIR, "home")
+    os.makedirs(HOME_DIR, exist_ok=True)
+    os.environ["HOME"] = HOME_DIR
+    os.environ["USERPROFILE"] = HOME_DIR
+
+    # fake mpl config directory
+    os.environ["MPLCONFIGDIR"] = os.path.join(TEMP_DIR, "mplconfig")
 
 
 def handler(event, context):
-    # create fake home to ensure isolation
-    fake_home = os.path.abspath(os.path.join(TEMP_DIR, "home"))
-    os.makedirs(fake_home, exist_ok=True)
-    os.environ["HOME"] = fake_home
-    os.environ["USERPROFILE"] = fake_home
+    # configure the environment variables
+    configure_env()
+    print(tempfile.gettempdir())
 
     # set JWT token
     causalbench.services.auth.__access_token = event.get('jwt_token', None)
