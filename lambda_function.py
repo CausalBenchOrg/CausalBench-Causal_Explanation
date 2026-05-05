@@ -1,4 +1,3 @@
-import atexit
 from collections import defaultdict
 import os
 from tempfile import tempdir
@@ -83,8 +82,7 @@ def handler(event, context):
         try:
             if len(dimensions) > 0:
                 cols = ["HP." + dim for dim in dimensions.keys()]
-                # data = list(group_data["data"][cols].itertuples(index=False, name=None))
-                # group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)
+                
                 sample_frame = group_data["data"][cols + ["outcome"]].copy()
                 group_data['recommendations'] = run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_points)
             else:
@@ -106,11 +104,6 @@ def handler(event, context):
         send_email(event.get('user_email'), "[CausalBench] Causal Analysis Results", CAUSAL_ANALYSIS_EMAIL_BODY, attachments=attachments)
     except Exception as e:
         print(f"Error sending email: {e}")
-    
-    # # remove the attachments after sending the email
-    # for attachment in attachments:
-    #     if os.path.exists(attachment):
-    #         atexit.register(lambda path=attachment: os.remove(path))
     
     response = {
         "analysis_results": causal_analysis_results
