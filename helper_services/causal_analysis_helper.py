@@ -119,6 +119,7 @@ def run_causal_analysis(download_dir,
     raw_df = pd.DataFrame()
     hyperparameters = []
     experiment_count = 0
+    load_error = None
     try:
         if download_dir:
             print(f"Processing ZIP files from {download_dir}")
@@ -167,6 +168,7 @@ def run_causal_analysis(download_dir,
         
     except Exception as e:
         print(f"Error loading data: {e}")
+        load_error = str(e)
 
     if group_by_metric:
         df_columns = ['dataset', 'model', 'metric'] + hyperparameters + ['outcome']
@@ -293,7 +295,10 @@ def run_causal_analysis(download_dir,
     insufficient_data = False
     insufficient_data_reason = None
 
-    if raw_df.empty:
+    if load_error is not None:
+        insufficient_data = True
+        insufficient_data_reason = f"Error loading data: {load_error}"
+    elif raw_df.empty:
         insufficient_data = True
         insufficient_data_reason = "No data files could be downloaded from provided URLs"
     elif len(hyperparameters) == 0:

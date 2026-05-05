@@ -47,7 +47,7 @@ def build_email_body(causal_analysis_results, event):
             if group == "_metadata":
                 continue
             for k, v in group_data.get("effects", {}).items():
-                if not (isinstance(v, float) and math.isnan(v)):
+                if isinstance(v, (int, float)) and math.isfinite(v):
                     all_effects[k] = v
 
         if all_effects:
@@ -102,7 +102,7 @@ def handler(event, context):
         dimensions = defaultdict(dict)
         for k, v in effects.items():
             k = k.split(".")[1]  # Remove 'HP.' prefix
-            if k in list(event.get('hyperparameter_limits', {}).keys()) and v != 0:
+            if k in list(event.get('hyperparameter_limits', {}).keys()) and math.isfinite(v) and v != 0:
                 dimensions[k]['strength'] = v
                 dimensions[k]['min_val'] = event.get('hyperparameter_limits', {})[k]['min']
                 dimensions[k]['max_val'] = event.get('hyperparameter_limits', {})[k]['max']
