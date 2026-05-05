@@ -41,7 +41,6 @@ def configure_env():
 def handler(event, context):
     # configure the environment variables
     configure_env()
-    print(tempfile.gettempdir())
 
     # set JWT token
     causalbench.services.auth.__access_token = event.get('jwt_token', None)
