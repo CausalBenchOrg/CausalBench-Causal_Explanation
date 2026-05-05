@@ -22,20 +22,20 @@ def configure_env():
     Directory setup to ensure isolation
     """
     # fake temporary directory
-    TEMP_DIR = tempfile.mkdtemp()
+    temp_dir = tempfile.mkdtemp()
     tempfile.tempdir = None
-    os.environ["TMPDIR"] = TEMP_DIR
-    os.environ["TEMP"] = TEMP_DIR
-    os.environ["TMP"] = TEMP_DIR
+    os.environ["TMPDIR"] = temp_dir
+    os.environ["TEMP"] = temp_dir
+    os.environ["TMP"] = temp_dir
 
     # fake home directory
-    HOME_DIR = os.path.join(TEMP_DIR, "home")
-    os.makedirs(HOME_DIR, exist_ok=True)
-    os.environ["HOME"] = HOME_DIR
-    os.environ["USERPROFILE"] = HOME_DIR
+    home_dir = os.path.join(temp_dir, "home")
+    os.makedirs(home_dir, exist_ok=True)
+    os.environ["HOME"] = home_dir
+    os.environ["USERPROFILE"] = home_dir
 
     # fake mpl config directory
-    os.environ["MPLCONFIGDIR"] = os.path.join(TEMP_DIR, "mplconfig")
+    os.environ["MPLCONFIGDIR"] = os.path.join(temp_dir, "mplconfig")
 
 
 def handler(event, context):
