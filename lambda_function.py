@@ -1,6 +1,5 @@
 from collections import defaultdict
 import os
-from tempfile import tempdir
 import tempfile
 
 import causalbench
