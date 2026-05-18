@@ -59,9 +59,9 @@ def handler(event, context):
     # find all causal effects
     causal_analysis_results, download_dir = run_causal_analysis(
         download_dir=download_dir,
-        hp_dtypes=hp_dtypes,
+        data_types=hp_dtypes,
         outcome_column=outcome_column,
-        candidate_hyperparameters= event.get('candidate_hyperparameters', None)
+        candidates=event.get('candidate_hyperparameters', None)
     )
 
     # find all causal recommendations
