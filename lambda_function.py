@@ -12,7 +12,6 @@ from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
 from helper_services.mail_helper import send_email
 import numpy as np
-from common.common_constants import CAUSAL_ANALYSIS_EMAIL_BODY
 
 
 
