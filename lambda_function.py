@@ -1,6 +1,6 @@
-import atexit
 from collections import defaultdict
 import os
+import tempfile
 
 import causalbench
 from helper_services.causal_analysis_helper import run_causal_analysis
@@ -12,7 +12,6 @@ from helper_services.report_helper import generate_report
 from helper_services.hp_dtype_helper import get_hp_dtypes
 from helper_services.mail_helper import send_email
 import numpy as np
-from common.common_constants import TEMP_DIR
 
 
 def build_email_body(causal_analysis_results, event):
@@ -64,12 +63,30 @@ def build_email_body(causal_analysis_results, event):
     return "\n".join(lines)
 
 
+def configure_env():
+    """
+    Directory setup to ensure isolation
+    """
+    # fake temporary directory
+    temp_dir = tempfile.mkdtemp()
+    tempfile.tempdir = None
+    os.environ["TMPDIR"] = temp_dir
+    os.environ["TEMP"] = temp_dir
+    os.environ["TMP"] = temp_dir
+
+    # fake home directory
+    home_dir = os.path.join(temp_dir, "home")
+    os.makedirs(home_dir, exist_ok=True)
+    os.environ["HOME"] = home_dir
+    os.environ["USERPROFILE"] = home_dir
+
+    # fake mpl config directory
+    os.environ["MPLCONFIGDIR"] = os.path.join(temp_dir, "mplconfig")
+
+
 def handler(event, context):
-    # create fake home to ensure isolation
-    fake_home = os.path.abspath(os.path.join(TEMP_DIR, "home"))
-    os.makedirs(fake_home, exist_ok=True)
-    os.environ["HOME"] = fake_home
-    os.environ["USERPROFILE"] = fake_home
+    # configure the environment variables
+    configure_env()
 
     # set JWT token
     causalbench.services.auth.__access_token = event.get('jwt_token', None)
@@ -112,8 +129,7 @@ def handler(event, context):
         try:
             if len(dimensions) > 0:
                 cols = ["HP." + dim for dim in dimensions.keys()]
-                # data = list(group_data["data"][cols].itertuples(index=False, name=None))
-                # group_data['recommendations'] = run_causal_recommendation(data, dimensions, hp_dtypes, max_points)
+                
                 sample_frame = group_data["data"][cols + ["outcome"]].copy()
                 group_data['recommendations'] = run_g2s_causal_recommendation(sample_frame, dimensions, hp_dtypes, max_points)
             else:
@@ -135,11 +151,6 @@ def handler(event, context):
         send_email(event.get('user_email'), "[CausalBench] Causal Analysis Results", build_email_body(causal_analysis_results, event), attachments=attachments)
     except Exception as e:
         print(f"Error sending email: {e}")
-    
-    # # remove the attachments after sending the email
-    # for attachment in attachments:
-    #     if os.path.exists(attachment):
-    #         atexit.register(lambda path=attachment: os.remove(path))
     
     response = {
         "analysis_results": causal_analysis_results
