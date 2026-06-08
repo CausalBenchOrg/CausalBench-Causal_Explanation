@@ -14,6 +14,54 @@ from helper_services.mail_helper import send_email
 import numpy as np
 
 
+def build_email_body(causal_analysis_results, event):
+    outcome_column = event.get('outcome_column', 'Time.Duration')
+    filters = event.get('filters', None)
+    metadata = causal_analysis_results.get('_metadata', {})
+
+    experiment_count = metadata.get('experiment_count', 0)
+    insufficient_data = metadata.get('insufficient_data', False)
+    insufficient_data_reason = metadata.get('insufficient_data_reason', None)
+
+    lines = ["CausalBench+ Causal Analysis Report", ""]
+    lines.append(f"Outcome metric: {outcome_column}")
+    lines.append(f"Experiments: Effects on {outcome_column} ({experiment_count} experiments)")
+
+    if filters:
+        filter_str = ", ".join(f"{k}={v}" for k, v in filters.items()) if isinstance(filters, dict) else str(filters)
+        lines.append(f"Filters applied: {filter_str}")
+
+    lines.append("")
+
+    if insufficient_data:
+        lines.append("INSUFFICIENT DATA: Causal effects could not be computed.")
+        if insufficient_data_reason:
+            lines.append(f"Reason: {insufficient_data_reason}")
+        lines.append("")
+        lines.append("To get results, run more experiments with varied hyperparameter configurations.")
+        lines.append("Minimum requirements: ≥ 2 data points per variable, ≥ 2 unique values per hyperparameter.")
+    else:
+        all_effects = {}
+        for group, group_data in causal_analysis_results.items():
+            if group == "_metadata":
+                continue
+            for k, v in group_data.get("effects", {}).items():
+                if isinstance(v, (int, float)) and math.isfinite(v):
+                    all_effects[k] = v
+
+        if all_effects:
+            sorted_effects = sorted(all_effects.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
+            lines.append("Top causal effects:")
+            for hp, effect in sorted_effects:
+                hp_name = hp.split(".", 1)[1] if "." in hp else hp
+                sign = "+" if effect >= 0 else ""
+                lines.append(f"  {hp_name}: {sign}{effect:.4f}")
+
+    lines.append("")
+    lines.append("Full results are in the attached PDF report.")
+
+    return "\n".join(lines)
+
 
 def configure_env():
     """
