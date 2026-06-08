@@ -50,33 +50,33 @@ def compute_CATE(data, treatment, outcome, graph):
         return np.nan
 
 
-def compute_score(data, hyperparameters, outcome_column):
+def compute_score(data, features, outcome_column):
     data = data.copy()
     
     cols_to_drop = []
     for col in data.columns:
-        if col not in hyperparameters and col != outcome_column:
+        if col not in features and col != outcome_column:
             cols_to_drop.append(col)
     
     if cols_to_drop:
         data = data.drop(columns=cols_to_drop)
 
     G = nx.DiGraph()
-    for hyperparameter in sorted(hyperparameters):
-        G.add_edge(hyperparameter, outcome_column)
+    for feature in sorted(features):
+        G.add_edge(feature, outcome_column)
 
-    scores = np.zeros(shape=(len(hyperparameters), 1))
-    scores = pd.DataFrame(scores, index=sorted(hyperparameters), columns=[outcome_column])
+    scores = np.zeros(shape=(len(features), 1))
+    scores = pd.DataFrame(scores, index=sorted(features), columns=[outcome_column])
 
-    for hyperparameter in sorted(hyperparameters):
-        scores.loc[hyperparameter, outcome_column] = compute_CATE(data, hyperparameter, outcome_column, G)
+    for feature in sorted(features):
+        scores.loc[feature, outcome_column] = compute_CATE(data, feature, outcome_column, G)
 
     return scores
 
 
 def run_causal_analysis(download_dir,
-                        hp_dtypes=None,
-                        candidate_hyperparameters=None, 
+                        data_types=None,
+                        candidates=None, 
                         outcome_column=None,
                         logger=None):
     """
@@ -84,7 +84,7 @@ def run_causal_analysis(download_dir,
     
     Args:
         download_dir (string): Path to directory containing ZIP files to analyze
-        candidate_hyperparameters (list): List of hyperparameter column names to analyze
+        candidates (list): List of candidate feature column names to analyze
         outcome_column (str): Column name for the outcome variable to analyze
         output_filename (str): Name of the output YAML file
     
@@ -108,6 +108,18 @@ def run_causal_analysis(download_dir,
         'Metric.WriteBytes':['DS.Rows', 'DS.Cols', 'SW.', 'HP.', 'Model.'],
         'Metric.Memory':['DS.Rows', 'DS.Cols', 'SW.', 'HP.', 'Model.']
     }
+
+    # set hardware and software column data types
+    data_types['Memory'] = 'decimal'
+    data_types['GPUMemoryIdle'] = 'decimal'
+    data_types['GPUMemoryPeak'] = 'decimal'
+    data_types['ReadBytes'] = 'decimal'
+    data_types['WriteBytes'] = 'decimal'
+    data_types['MemoryTotal'] = 'decimal'
+    data_types['StorageTotal'] = 'decimal'
+    data_types['CPUSingleCore'] = 'decimal'
+    data_types['CPUMultiCore'] = 'decimal'
+    data_types['GPUScore'] = 'decimal'
     
     encode = []
     raw_df = pd.DataFrame()
@@ -128,46 +140,46 @@ def run_causal_analysis(download_dir,
             potential_cols = [col for col in raw_df.columns 
                             if any(col.startswith(prefix) for prefix in prefixes)]
             
-            candidate_hyperparameters = []
+            candidates = []
             for col in potential_cols:
                 hp_col = col.split(".")[1]  # Remove 'HP.' prefix
-                if hp_col in hp_dtypes and hp_dtypes[hp_col] in ['integer', 'decimal']:
-                    candidate_hyperparameters.append(col)
+                if hp_col in data_types and data_types[hp_col] in ['integer', 'decimal']:
+                    candidates.append(col)
                 else:
                     print(f"Skipping non-numeric column: {col}")
             
-            print(f"Auto-selected candidate_hyperparameters for {outcome_column}: {len(candidate_hyperparameters)} numeric columns with prefixes {prefixes}")
+            print(f"Auto-selected candidate features for {outcome_column}: {len(candidates)} numeric columns with prefixes {prefixes}")
         
-        elif candidate_hyperparameters is None:
-            print("No candidate hyperparameters provided and no default mapping found")
+        elif candidates is None:
+            print("No candidate features provided and no default mapping found")
         
         hw_cols = [col for col in raw_df.columns if any(hw in col for hw in ['HW.', 'Model.', 'Time.', 'SW.', 'HP.', 'Metric.'])]
         print(f"Available columns: {sorted(hw_cols)}")
         print(f"Datasets: {sorted(raw_df['DS.Name'].unique())}")
         
-        hyperparameters = []
-        for feature in sorted(candidate_hyperparameters):
+        features = []
+        for feature in sorted(candidates):
             if feature in raw_df.columns:
                 unique_values = raw_df[feature].dropna().unique()
                 if len(unique_values) > 1: 
-                    hyperparameters.append(feature)
+                    features.append(feature)
                     print(f"{feature}: {len(unique_values)} unique values")
                 else:
                     print(f"{feature}: Only {len(unique_values)} unique value(s) - skipping")
             else:
                 print(f"{feature}: Not found in data - skipping")
         
-        hyperparameters = sorted(hyperparameters)
-        print(f"Final features to analyze: {hyperparameters}")
+        features = sorted(features)
+        print(f"Final features to analyze: {features}")
         
     except Exception as e:
         print(f"Error loading data: {e}")
         load_error = str(e)
 
     if group_by_metric:
-        df_columns = ['dataset', 'model', 'metric'] + hyperparameters + ['outcome']
+        df_columns = ['dataset', 'model', 'metric'] + features + ['outcome']
     else:
-        df_columns = ['dataset'] + hyperparameters + ['outcome']
+        df_columns = ['dataset'] + features + ['outcome']
     
     df = pd.DataFrame(columns=df_columns)
 
@@ -180,9 +192,9 @@ def run_causal_analysis(download_dir,
             new_row.append(row.get('Model.Name', 'Unknown'))
             new_row.append(row.get('Metric.Name', 'Unknown'))
 
-        for hyperparameter in hyperparameters:
-            if hyperparameter in row.index and pd.notna(row[hyperparameter]):
-                new_row.append(row[hyperparameter])
+        for feature in features:
+            if feature in row.index and pd.notna(row[feature]):
+                new_row.append(row[feature])
             else:
                 new_row.append(None)
         
@@ -197,11 +209,11 @@ def run_causal_analysis(download_dir,
         
         df.loc[index] = new_row
 
-    for index, hyperparameter in enumerate(hyperparameters):
+    for index, feature in enumerate(features):
         if index in encode:
             label_encoder = LabelEncoder()
             label_encoder.random_state = RANDOM_SEED 
-            df[hyperparameter] = label_encoder.fit_transform(df[hyperparameter])
+            df[feature] = label_encoder.fit_transform(df[feature])
             print(label_encoder.classes_)
 
     df = df.dropna()
@@ -244,7 +256,7 @@ def run_causal_analysis(download_dir,
                     analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
                     print("Features normalized using StandardScaler")
                 
-                score = compute_score(analysis_data, hyperparameters, 'outcome')
+                score = compute_score(analysis_data, features, 'outcome')
 
                 for feature in score.index:
                     effect_value = score.loc[feature, 'outcome']
@@ -271,7 +283,7 @@ def run_causal_analysis(download_dir,
                 analysis_data[numeric_cols] = scaler.fit_transform(analysis_data[numeric_cols])
                 print("Features normalized using StandardScaler")
             
-            score = compute_score(analysis_data, hyperparameters, 'outcome')
+            score = compute_score(analysis_data, features, 'outcome')
             
             for feature in score.index:
                 effect_value = score.loc[feature, 'outcome']
