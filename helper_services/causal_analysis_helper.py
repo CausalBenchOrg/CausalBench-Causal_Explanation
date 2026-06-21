@@ -22,6 +22,8 @@ def compute_CATE(data, treatment, outcome, graph):
             data_clean[outcome] = pd.to_numeric(data_clean[outcome], errors='coerce')
         
         data_clean = data_clean.dropna(subset=[treatment, outcome])
+        data_clean = data_clean.dropna(axis=1, how="all")
+        data_clean = data_clean.dropna(axis=0, how="any")
         
         data_clean = data_clean.sort_values([treatment, outcome]).reset_index(drop=True)
         
@@ -216,7 +218,6 @@ def run_causal_analysis(download_dir,
             df[feature] = label_encoder.fit_transform(df[feature])
             print(label_encoder.classes_)
 
-    df = df.dropna()
     experiment_count = len(df)
     print(f"After cleaning: {experiment_count} experiments remain")
 

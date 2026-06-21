@@ -9,7 +9,7 @@ class DummyContext:
     aws_request_id = "local-1234"
 
 if __name__ == "__main__":
-    with open("event.json", "r", encoding="utf-8") as f:
+    with open("json/event.json", "r", encoding="utf-8") as f:
         event = json.load(f)
     ctx = DummyContext()
     resp = handler(event, ctx)
