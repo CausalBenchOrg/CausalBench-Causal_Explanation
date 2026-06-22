@@ -24,7 +24,7 @@ def download_zip_from_url(url, download_dir):
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         
-        print(f"Downloaded: {filename}")
+        print(f"Downloaded: {filepath}")
         return filepath
         
     except Exception as e:
