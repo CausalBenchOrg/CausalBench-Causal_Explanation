@@ -22,6 +22,8 @@ def compute_CATE(data, treatment, outcome, graph):
             data_clean[outcome] = pd.to_numeric(data_clean[outcome], errors='coerce')
         
         data_clean = data_clean.dropna(subset=[treatment, outcome])
+        data_clean = data_clean.dropna(axis=1, how="all")
+        data_clean = data_clean.dropna(axis=0, how="any")
         
         data_clean = data_clean.sort_values([treatment, outcome]).reset_index(drop=True)
         
@@ -123,7 +125,7 @@ def run_causal_analysis(download_dir,
     
     encode = []
     raw_df = pd.DataFrame()
-    hyperparameters = []
+    features = []
     experiment_count = 0
     load_error = None
     try:
@@ -157,7 +159,6 @@ def run_causal_analysis(download_dir,
         print(f"Available columns: {sorted(hw_cols)}")
         print(f"Datasets: {sorted(raw_df['DS.Name'].unique())}")
         
-        features = []
         for feature in sorted(candidates):
             if feature in raw_df.columns:
                 unique_values = raw_df[feature].dropna().unique()
@@ -216,7 +217,6 @@ def run_causal_analysis(download_dir,
             df[feature] = label_encoder.fit_transform(df[feature])
             print(label_encoder.classes_)
 
-    df = df.dropna()
     experiment_count = len(df)
     print(f"After cleaning: {experiment_count} experiments remain")
 
@@ -307,9 +307,9 @@ def run_causal_analysis(download_dir,
     elif raw_df.empty:
         insufficient_data = True
         insufficient_data_reason = "No data files could be downloaded from provided URLs"
-    elif len(hyperparameters) == 0:
+    elif len(features) == 0:
         insufficient_data = True
-        insufficient_data_reason = "No hyperparameters with sufficient variation found"
+        insufficient_data_reason = "No features with sufficient variation found"
     elif experiment_count < 2:
         insufficient_data = True
         insufficient_data_reason = "Too few experiments after data cleaning (need ≥ 2)"
@@ -325,7 +325,7 @@ def run_causal_analysis(download_dir,
 
     group_results["_metadata"] = {
         "experiment_count": experiment_count,
-        "hyperparameter_count": len(hyperparameters),
+        "feature_count": len(features),
         "insufficient_data": insufficient_data,
         "insufficient_data_reason": insufficient_data_reason,
     }
